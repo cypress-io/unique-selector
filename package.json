@@ -53,6 +53,7 @@
     "jsdom": "^8.3.0",
     "mocha": "~1.7.4",
     "mocha-jsdom": "^1.1.0",
-    "mocha-phantomjs": "~1.1.1"
+    "mocha-phantomjs": "~1.1.1",
+    "npm-scripts-watcher": "^1.0.2"
   }
 }
