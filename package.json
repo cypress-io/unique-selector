@@ -1,5 +1,5 @@
 {
-  "name": "unique-selector",
+  "name": "@cypress/unique-selector",
   "version": "0.3.6",
   "description": "Given a DOM node, return a unique CSS selector matching only that element",
   "main": "./lib/index.js",
