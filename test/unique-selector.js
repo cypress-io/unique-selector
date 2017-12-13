@@ -17,6 +17,15 @@ describe( 'Unique Selector Tests', () =>
     expect( uniqueSelector ).to.equal( '#so' );
   } );
 
+  it( 'ID that needs escaping', () =>
+  {
+    $( 'body' ).get( 0 ).innerHTML = ''; //Clear previous appends
+    $( 'body' ).append( '<div id="123" class="test3"></div>' );
+    const findNode = $( 'body' ).find( '.test3' ).get( 0 );
+    const uniqueSelector = unique( findNode );
+    expect( uniqueSelector ).to.equal( '#\\31 23' );
+  } );
+
   it( 'Class', () =>
   {
     $( 'body' ).get( 0 ).innerHTML = ''; //Clear previous appends
@@ -24,6 +33,15 @@ describe( 'Unique Selector Tests', () =>
     const findNode = $( 'body' ).find( '.test2' ).get( 0 );
     const uniqueSelector = unique( findNode );
     expect( uniqueSelector ).to.equal( '.test2' );
+  } );
+
+  it( 'Class that needs escaping', () =>
+  {
+    $( 'body' ).get( 0 ).innerHTML = ''; //Clear previous appends
+    $( 'body' ).append( '<div class="@test test2"></div>' );
+    const findNode = $( 'body' ).find( '.test2' ).get( 0 );
+    const uniqueSelector = unique( findNode );
+    expect( uniqueSelector ).to.equal( '.\\@test' );
   } );
 
   it( 'Classes', () =>

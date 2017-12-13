@@ -1,3 +1,5 @@
+import 'css.escape';
+
 /**
  * Returns the Tag of the element
  * @param  { Object } element
@@ -9,7 +11,7 @@ export function getID( el )
 
   if( id !== null && id !== '')
   {
-    return `#${id}`;
+    return `#${CSS.escape( id )}`;
   }
   return null;
 }

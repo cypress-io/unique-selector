@@ -1,3 +1,5 @@
+import 'css.escape';
+
 /**
  * Get class names for an element
  *
@@ -32,5 +34,5 @@ export function getClasses( el )
 export function getClassSelectors( el )
 {
   const classList = getClasses( el ).filter( Boolean );
-  return classList.map( cl => `.${cl}` );
+  return classList.map( cl => `.${CSS.escape( cl )}` );
 }

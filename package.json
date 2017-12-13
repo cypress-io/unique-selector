@@ -55,5 +55,8 @@
     "mocha-jsdom": "^1.1.0",
     "mocha-phantomjs": "~1.1.1",
     "npm-scripts-watcher": "^1.0.2"
+  },
+  "dependencies": {
+    "css.escape": "^1.5.1"
   }
 }
