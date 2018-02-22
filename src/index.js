@@ -10,6 +10,7 @@ import { getNthChild } from './getNthChild';
 import { getTag } from './getTag';
 import { isUnique } from './isUnique';
 import { getParents } from './getParents';
+import { getData } from './getData';
 
 
 /**
@@ -21,11 +22,14 @@ function getAllSelectors( el, selectors, attributesToIgnore )
 {
   const funcs =
     {
-      'Tag'        : getTag,
-      'NthChild'   : getNthChild,
-      'Attributes' : elem => getAttributes( elem, attributesToIgnore ),
-      'Class'      : getClassSelectors,
-      'ID'         : getID,
+      'data-test'   : getData( 'test' ),
+      'data-testid' : getData( 'testid' ),
+      'data-cy'     : getData( 'cy' ),
+      'tag'         : getTag,
+      'nth-child'   : getNthChild,
+      'attributes'  : elem => getAttributes( elem, attributesToIgnore ),
+      'class'       : getClassSelectors,
+      'id'          : getID,
     };
 
   return selectors.reduce( ( res, next ) =>
@@ -104,50 +108,39 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
 
   for( let selectorType of selectorTypes )
   {
-      const { ID, Tag, Class : Classes, Attributes, NthChild } = elementSelectors;
-      switch ( selectorType )
-      {
-        case 'ID' :
-        if ( Boolean( ID ) && testUniqueness( element, ID ) )
+    const selector = elementSelectors[ selectorType ];
+    if ( !Boolean( selector ) ) continue;
+
+    switch ( selectorType )
+    {
+      case 'data-cy' :
+      case 'data-test' :
+      case 'data-testid' :
+      case 'id' :
+      case 'tag':
+        if ( testUniqueness( element, selector ) )
         {
-            return ID;
+          return selector;
+        }
+        break;
+      case 'class':
+      case 'attributes':
+        if ( selector.length )
+        {
+          foundSelector = getUniqueCombination( element, selector, elementSelectors.tag );
+          if ( foundSelector )
+          {
+            return foundSelector;
+          }
         }
         break;
 
-        case 'Tag':
-          if ( Boolean( Tag ) && testUniqueness( element, Tag ) )
-          {
-              return Tag;
-          }
-          break;
+      case 'nth-child':
+        return selector;
 
-        case 'Class':
-          if ( Boolean( Classes ) && Classes.length )
-          {
-            foundSelector = getUniqueCombination( element, Classes, Tag );
-            if (foundSelector) {
-              return foundSelector;
-            }
-          }
-          break;
-
-        case 'Attributes':
-          if ( Boolean( Attributes ) && Attributes.length )
-          {
-            foundSelector = getUniqueCombination( element, Attributes, Tag );
-            if ( foundSelector )
-            {
-              return foundSelector;
-            }
-          }
-          break;
-
-        case 'NthChild':
-          if ( Boolean( NthChild ) )
-          {
-            return NthChild
-          }
-      }
+      default:
+        break;
+    }
   }
   return '*';
 }
@@ -162,7 +155,7 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
 
 export default function unique( el, options={} )
 {
-  const { selectorTypes=[ 'ID', 'Class', 'Tag', 'NthChild' ], attributesToIgnore= ['id', 'class', 'length'] } = options;
+  const { selectorTypes=['id', 'class', 'tag', 'nth-child'], attributesToIgnore= ['id', 'class', 'length'] } = options;
   const allSelectors = [];
   const parents = getParents( el );
 
