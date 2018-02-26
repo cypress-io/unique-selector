@@ -108,64 +108,24 @@ describe( 'Unique Selector Tests', () =>
     expect( uniqueSelector ).to.equal( '[test="5"]' );
   } );
 
-  it( 'data-cy', () =>
+  it( 'data-foo', () =>
   {
     $( 'body' ).get( 0 ).innerHTML = ''; //Clear previous appends
-    $( 'body' ).append( '<div data-cy="so" class="test6"></div>' );
+    $( 'body' ).append( '<div data-foo="so" class="test6"></div>' );
     const findNode = $( 'body' ).find( '.test6' ).get( 0 );
-    findNode.dataset = { cy : 'so' }
-    const uniqueSelector = unique( findNode, { selectorTypes : ['data-cy'] } );
-    expect( uniqueSelector ).to.equal( '[data-cy=so]' );
+    findNode.dataset = { foo : 'so' }
+    const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo'] } );
+    expect( uniqueSelector ).to.equal( '[data-foo=so]' );
   } );
 
-  it( 'data-cy that needs escaping', () =>
+  it( 'data-foo that needs escaping', () =>
   {
     $( 'body' ).get( 0 ).innerHTML = ''; //Clear previous appends
-    $( 'body' ).append( '<div data-cy="123" class="test7"></div>' );
+    $( 'body' ).append( '<div data-foo="123" class="test7"></div>' );
     const findNode = $( 'body' ).find( '.test7' ).get( 0 );
-    findNode.dataset = { cy : '123' }
-    const uniqueSelector = unique( findNode, { selectorTypes : ['data-cy'] } );
-    expect( uniqueSelector ).to.equal( '[data-cy=\\31 23]' );
-  } );
-
-  it( 'data-test', () =>
-  {
-    $( 'body' ).get( 0 ).innerHTML = ''; //Clear previous appends
-    $( 'body' ).append( '<div data-test="so" class="test6"></div>' );
-    const findNode = $( 'body' ).find( '.test6' ).get( 0 );
-    findNode.dataset = { test : 'so' }
-    const uniqueSelector = unique( findNode, { selectorTypes : ['data-test'] } );
-    expect( uniqueSelector ).to.equal( '[data-test=so]' );
-  } );
-
-  it( 'data-test that needs escaping', () =>
-  {
-    $( 'body' ).get( 0 ).innerHTML = ''; //Clear previous appends
-    $( 'body' ).append( '<div data-test="123" class="test7"></div>' );
-    const findNode = $( 'body' ).find( '.test7' ).get( 0 );
-    findNode.dataset = { test : '123' }
-    const uniqueSelector = unique( findNode, { selectorTypes : ['data-test'] } );
-    expect( uniqueSelector ).to.equal( '[data-test=\\31 23]' );
-  } );
-
-  it( 'data-testid', () =>
-  {
-    $( 'body' ).get( 0 ).innerHTML = ''; //Clear previous appends
-    $( 'body' ).append( '<div data-testid="so" class="test6"></div>' );
-    const findNode = $( 'body' ).find( '.test6' ).get( 0 );
-    findNode.dataset = { testid : 'so' }
-    const uniqueSelector = unique( findNode, { selectorTypes : ['data-testid'] } );
-    expect( uniqueSelector ).to.equal( '[data-testid=so]' );
-  } );
-
-  it( 'data-testid that needs escaping', () =>
-  {
-    $( 'body' ).get( 0 ).innerHTML = ''; //Clear previous appends
-    $( 'body' ).append( '<div data-testid="123" class="test7"></div>' );
-    const findNode = $( 'body' ).find( '.test7' ).get( 0 );
-    findNode.dataset = { testid : '123' }
-    const uniqueSelector = unique( findNode, { selectorTypes : ['data-testid'] } );
-    expect( uniqueSelector ).to.equal( '[data-testid=\\31 23]' );
+    findNode.dataset = { foo : '123' }
+    const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo'] } );
+    expect( uniqueSelector ).to.equal( '[data-foo=\\31 23]' );
   } );
 
 } );

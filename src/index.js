@@ -13,6 +13,8 @@ import { getParents } from './getParents';
 import { getData } from './getData';
 
 
+const dataRegex = /^data-(.*)/;
+
 /**
  * Returns all the selectors of the elmenet
  * @param  { Object } element
@@ -22,9 +24,6 @@ function getAllSelectors( el, selectors, attributesToIgnore )
 {
   const funcs =
     {
-      'data-test'   : getData( 'test' ),
-      'data-testid' : getData( 'testid' ),
-      'data-cy'     : getData( 'cy' ),
       'tag'         : getTag,
       'nth-child'   : getNthChild,
       'attributes'  : elem => getAttributes( elem, attributesToIgnore ),
@@ -32,7 +31,9 @@ function getAllSelectors( el, selectors, attributesToIgnore )
       'id'          : getID,
     };
 
-  return selectors.reduce( ( res, next ) =>
+  return selectors
+  .filter( ( selector ) => !dataRegex.test( selector ) )
+  .reduce( ( res, next ) =>
   {
     res[ next ] = funcs[ next ]( el );
     return res;
@@ -108,14 +109,20 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
 
   for( let selectorType of selectorTypes )
   {
-    const selector = elementSelectors[ selectorType ];
+    let selector = elementSelectors[ selectorType ];
+
+    const dataMatches = selectorType.match( dataRegex );
+    if ( dataMatches && dataMatches[ 1 ] )
+    {
+      selector = getData( dataMatches[ 1 ], element );
+      selectorType = 'data'
+    }
+
     if ( !Boolean( selector ) ) continue;
 
     switch ( selectorType )
     {
-      case 'data-cy' :
-      case 'data-test' :
-      case 'data-testid' :
+      case 'data' :
       case 'id' :
       case 'tag':
         if ( testUniqueness( element, selector ) )

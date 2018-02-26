@@ -7,7 +7,7 @@ import 'css.escape';
  * @param  { Object } element
  * @return { String }
  */
-export const getData = ( dataAttr ) => ( el ) =>
+export const getData = ( dataAttr, el ) =>
 {
   const value = el.dataset && el.dataset[ dataAttr ]
 
