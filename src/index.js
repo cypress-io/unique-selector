@@ -12,8 +12,7 @@ import { isUnique } from './isUnique';
 import { getParents } from './getParents';
 import { getData } from './getData';
 
-
-const dataRegex = /^data-(.*)/;
+const dataRegex = /^data-(.+)/;
 
 /**
  * Returns all the selectors of the elmenet
@@ -24,11 +23,11 @@ function getAllSelectors( el, selectors, attributesToIgnore )
 {
   const funcs =
     {
-      'tag'         : getTag,
-      'nth-child'   : getNthChild,
-      'attributes'  : elem => getAttributes( elem, attributesToIgnore ),
-      'class'       : getClassSelectors,
-      'id'          : getID,
+      'tag'        : getTag,
+      'nth-child'  : getNthChild,
+      'attributes' : elem => getAttributes( elem, attributesToIgnore ),
+      'class'      : getClassSelectors,
+      'id'         : getID,
     };
 
   return selectors
@@ -61,7 +60,7 @@ function testUniqueness( element, selector )
  */
 function getFirstUnique( element, selectors )
 {
-    return selectors.find( testUniqueness.bind( null, element ) );
+  return selectors.find( testUniqueness.bind( null, element ) );
 }
 
 /**
@@ -74,22 +73,22 @@ function getFirstUnique( element, selectors )
 function getUniqueCombination( element, items, tag )
 {
   let combinations = getCombinations( items, 3 ),
-      firstUnique = getFirstUnique( element, combinations );
+    firstUnique = getFirstUnique( element, combinations );
 
   if( Boolean( firstUnique ) )
   {
-      return firstUnique;
+    return firstUnique;
   }
 
   if( Boolean( tag ) )
   {
-      combinations = combinations.map( combination => tag + combination );
-      firstUnique = getFirstUnique( element, combinations );
+    combinations = combinations.map( combination => tag + combination );
+    firstUnique = getFirstUnique( element, combinations );
 
-      if( Boolean( firstUnique ) )
+    if( Boolean( firstUnique ) )
       {
-          return firstUnique;
-      }
+      return firstUnique;
+    }
   }
 
   return null;
