@@ -117,14 +117,31 @@ describe( 'Unique Selector Tests', () =>
     expect( uniqueSelector ).to.equal( '[data-foo=so]' );
   } );
 
-  it( 'data-foo that needs escaping', () =>
+  it( 'data-foo-bar-baz', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; //Clear previous appends
-    $( 'body' ).append( '<div data-foo="123" class="test7"></div>' );
+    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+    $( 'body' ).append( '<div data-foo-bar-baz="so" class="test6"></div>' );
+    const findNode = $( 'body' ).find( '.test6' ).get( 0 );
+    const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo-bar-baz'] } );
+    expect( uniqueSelector ).to.equal( '[data-foo-bar-baz=so]' );
+  } );
+
+  it( 'data-foo-bar with quotes', () =>
+  {
+    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+    $( 'body' ).append( '<div data-foo-bar="button 123" class="test7"></div>' );
     const findNode = $( 'body' ).find( '.test7' ).get( 0 );
-    findNode.dataset = { foo : '123' }
+    const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo-bar'] } );
+    expect( uniqueSelector ).to.equal( '[data-foo-bar="button 123"]' );
+  } );
+
+  it( 'data-foo without value', () =>
+  {
+    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+    $( 'body' ).append( '<div data-foo class="test7"></div>' );
+    const findNode = $( 'body' ).find( '.test7' ).get( 0 );
     const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo'] } );
-    expect( uniqueSelector ).to.equal( '[data-foo=\\31 23]' );
+    expect( uniqueSelector ).to.equal( '[data-foo]' );
   } );
 
 } );

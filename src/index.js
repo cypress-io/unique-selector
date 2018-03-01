@@ -104,17 +104,25 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
 {
   let foundSelector;
 
+  const attributes = [...element.attributes];
+
   const elementSelectors = getAllSelectors( element, selectorTypes, attributesToIgnore );
 
   for( let selectorType of selectorTypes )
   {
     let selector = elementSelectors[ selectorType ];
 
-    const dataMatches = selectorType.match( dataRegex );
-    if ( dataMatches && dataMatches[ 1 ] )
+    // if we are a data attribute
+    if ( dataRegex.test( selectorType ) )
     {
-      selector = getData( dataMatches[ 1 ], element );
-      selectorType = 'data'
+      const dataSelector = getData( selectorType, attributes );
+
+      // if we found a selector via data attributes
+      if ( dataSelector )
+      {
+        selector = dataSelector;
+        selectorType = 'data';
+      }
     }
 
     if ( !Boolean( selector ) ) continue;
