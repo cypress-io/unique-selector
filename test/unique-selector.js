@@ -1,12 +1,11 @@
-const jsdom = require( 'mocha-jsdom' );
 const expect = require( 'chai' ).expect;
-import unique from '../src';
+const JSDOM = require('jsdom').JSDOM;
+const unique = require('../lib').default;
 
-const $ = require( 'jquery' )( require( 'jsdom' ).jsdom().defaultView );
+const $ = require( 'jquery' )( (new JSDOM()).window );
 
 describe( 'Unique Selector Tests', () =>
 {
-  jsdom( { skipWindowCheck : true } );
 
   it( 'ID', () =>
   {
