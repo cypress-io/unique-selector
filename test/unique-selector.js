@@ -113,7 +113,7 @@ describe( 'Unique Selector Tests', () =>
     $( 'body' ).append( '<div data-foo="so" class="test6"></div>' );
     const findNode = $( 'body' ).find( '.test6' ).get( 0 );
     const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo'] } );
-    expect( uniqueSelector ).to.equal( '[data-foo=so]' );
+    expect( uniqueSelector ).to.equal( '[data-foo="so"]' );
   } );
 
   it( 'data-foo-bar-baz', () =>
@@ -122,7 +122,7 @@ describe( 'Unique Selector Tests', () =>
     $( 'body' ).append( '<div data-foo-bar-baz="so" class="test6"></div>' );
     const findNode = $( 'body' ).find( '.test6' ).get( 0 );
     const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo-bar-baz'] } );
-    expect( uniqueSelector ).to.equal( '[data-foo-bar-baz=so]' );
+    expect( uniqueSelector ).to.equal( '[data-foo-bar-baz="so"]' );
   } );
 
   it( 'data-foo-bar with quotes', () =>

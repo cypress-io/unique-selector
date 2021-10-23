@@ -16,6 +16,25 @@ function needsQuote( v )
   return v !== CSS.escape( v );
 }
 
+/**
+  * Method to wrap the HTML attribute selector text in double quotes if there's missing
+  * @param {string} selector -> a string that represents a HTML attribute selector
+  * @returns {string} -> the selector wrapped in double quotes if needed
+  */
+const _setQuotesToAttrSelector = (selector) => {
+  const [attributeName, attributeValue] = selector.split('=')
+
+  if (attributeName && attributeValue) {
+    const hasQuotes = (attributeValue[0] === '"' || attributeValue[0] === '\'')
+
+    if (selector.split('').includes('[', ']') && !hasQuotes) {
+      return `[${attributeName.replace('[', '')}="${attributeValue.replace(']', '"]')}`
+    }
+}
+
+  return selector
+}
+
 export const getData = ( selectorType, attributes ) =>
 {
   for ( let i = 0; i < attributes.length; i++ )
@@ -31,13 +50,13 @@ export const getData = ( selectorType, attributes ) =>
         if ( needsQuote( value ) )
         {
           // if we have value that needs quotes
-          return `[${nodeName}="${value}"]`;
+          return _setQuotesToAttrSelector(`[${nodeName}="${value}"]`);
         }
 
-        return `[${nodeName}=${value}]`;
+        return _setQuotesToAttrSelector(`[${nodeName}=${value}]`);
       }
 
-      return `[${nodeName}]`;
+      return _setQuotesToAttrSelector(`[${nodeName}]`);
     }
   }
 

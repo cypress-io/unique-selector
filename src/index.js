@@ -15,7 +15,7 @@ import { getData } from './getData';
 const dataRegex = /^data-(.+)/;
 
 /**
- * Returns all the selectors of the elmenet
+ * Returns all the selectors of the element
  * @param  { Object } element
  * @return { Object }
  */
