@@ -133,14 +133,4 @@ describe( 'Unique Selector Tests', () =>
     const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo-bar'] } );
     expect( uniqueSelector ).to.equal( '[data-foo-bar="button 123"]' );
   } );
-
-  it( 'data-foo without value', () =>
-  {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
-    $( 'body' ).append( '<div data-foo class="test7"></div>' );
-    const findNode = $( 'body' ).find( '.test7' ).get( 0 );
-    const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo'] } );
-    expect( uniqueSelector ).to.equal( '[data-foo]' );
-  } );
-
 } );
