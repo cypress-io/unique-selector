@@ -1,5 +1,3 @@
-import 'css.escape';
-
 /**
  * Returns the data-{dataAttr} selector of the element wrapped in double quotes.
  * @param  { String } selectorType - The type of selector to return.
