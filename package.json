@@ -58,5 +58,8 @@
   },
   "dependencies": {
     "css.escape": "^1.5.1"
-  }
+  },
+  "files": [
+    "lib"
+  ]
 }
