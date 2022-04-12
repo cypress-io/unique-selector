@@ -143,4 +143,32 @@ describe( 'Unique Selector Tests', () =>
     expect( uniqueSelector ).to.equal( '[data-foo]' );
   } );
 
+  it( 'Shadow DOM', () =>
+  {
+    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+    $( 'body' ).append( '<div class="shadow-host"></div>' );
+    const shadowHost = $( 'body' ).find( '.shadow-host' ).get( 0 );
+    const shadowRoot = shadowHost.attachShadow( { mode : 'open' } );
+    shadowRoot.innerHTML = `
+      <div class="shadow-parent-one">
+        <div class="shadow-child" data-testid="child-one"></div>
+      </div>
+      <div class="shadow-parent-two">
+        <div class="shadow-child" data-testid="child-two"></div>
+      </div>
+    `;
+
+    const shadowParentOne = shadowRoot.querySelector( '.shadow-parent-one' );
+    const shadowChildTwo = shadowRoot.querySelector(
+      '.shadow-parent-two .shadow-child',
+    );
+
+    expect( unique( shadowParentOne ) ).to.equal( '.shadow-parent-one' );
+    expect( unique( shadowChildTwo ) ).to.equal(
+      '.shadow-parent-two > .shadow-child',
+    );
+    expect( unique( shadowChildTwo, { selectorTypes : ['data-testid'] } ) ).to.equal(
+      '[data-testid="child-two"]',
+    );
+  } );
 } );
