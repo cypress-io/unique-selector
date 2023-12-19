@@ -48,8 +48,12 @@ function getAllSelectors( el, selectors, attributesToIgnore )
 function testUniqueness( element, selector )
 {
   const { parentNode } = element;
-  const elements = parentNode.querySelectorAll( selector );
-  return elements.length === 1 && elements[ 0 ] === element;
+  try {
+    const elements = parentNode.querySelectorAll( selector );
+    return elements.length === 1 && elements[0] === element;
+  } catch (e) {
+    return false
+  }
 }
 
 /**
@@ -182,16 +186,36 @@ export default function unique( el, options={} )
     }
   }
 
-  const selectors = [];
-  for( let it of allSelectors )
-  {
-    selectors.unshift( it );
-    const selector = selectors.join( ' > ' );
-    if( isUnique( el, selector ) )
-    {
-      return selector;
+  let currentElement = el
+  while (currentElement) {
+    let selector = selectorCache ? selectorCache.get(currentElement) : undefined
+
+    if (!selector) {
+      selector = getUniqueSelector(
+        currentElement,
+        selectorTypes,
+        attributesToIgnore
+      )
+      if (selectorCache) {
+        selectorCache.set(currentElement, selector)
+       }
+     }
+
+    allSelectors.unshift(selector)
+    const maybeUniqueSelector = allSelectors.join(' > ')
+    let isUniqueSelector = isUniqueCache ? isUniqueCache.get(maybeUniqueSelector) : undefined
+    if (isUniqueSelector === undefined) {
+      isUniqueSelector = _isUnique.isUnique(el, maybeUniqueSelector)
+      if (isUniqueCache) {
+        isUniqueCache.set(maybeUniqueSelector, isUniqueSelector)
+      }
     }
-  }
+
+    if (isUniqueSelector) {
+      return maybeUniqueSelector
+    }
+    currentElement = currentElement.parentNode
+   }
 
   return null;
 }
