@@ -210,7 +210,7 @@ export default function unique( el, options={} )
     const maybeUniqueSelector = allSelectors.join(' > ')
     let isUniqueSelector = isUniqueCache ? isUniqueCache.get(maybeUniqueSelector) : undefined
     if (isUniqueSelector === undefined) {
-      isUniqueSelector = _isUnique.isUnique(el, maybeUniqueSelector)
+      isUniqueSelector = isUnique(el, maybeUniqueSelector)
       if (isUniqueCache) {
         isUniqueCache.set(maybeUniqueSelector, isUniqueSelector)
       }
