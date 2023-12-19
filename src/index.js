@@ -171,8 +171,7 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
  * @api private
  */
 
-export default function unique( el, options={} )
-{
+export default function unique( el, options={} ) {
   const { 
     selectorTypes=['id', 'class', 'tag', 'nth-child'], 
     attributesToIgnore= ['id', 'class', 'length'],
@@ -180,16 +179,6 @@ export default function unique( el, options={} )
     isUniqueCache
   } = options;
   const allSelectors = [];
-  const parents = getParents( el );
-
-  for( let elem of parents )
-  {
-    const selector = getUniqueSelector( elem, selectorTypes, attributesToIgnore );
-    if( Boolean( selector ) )
-    {
-      allSelectors.push( selector );
-    }
-  }
 
   let currentElement = el
   while (currentElement) {
