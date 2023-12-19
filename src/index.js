@@ -173,7 +173,12 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
 
 export default function unique( el, options={} )
 {
-  const { selectorTypes=['id', 'class', 'tag', 'nth-child'], attributesToIgnore= ['id', 'class', 'length'] } = options;
+  const { 
+    selectorTypes=['id', 'class', 'tag', 'nth-child'], 
+    attributesToIgnore= ['id', 'class', 'length'],
+    selectorCache,
+    isUniqueCache
+  } = options;
   const allSelectors = [];
   const parents = getParents( el );
 
