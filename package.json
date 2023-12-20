@@ -21,7 +21,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/ericclemmons/unique-selector.git"
+    "url": "git://github.com/cypress-io/unique-selector.git"
   },
   "keywords": [
     "dom",
@@ -30,13 +30,7 @@
     "selector",
     "event"
   ],
-  "author": "Eric Clemmons <eric@smarterspam.com>",
-  "contributors": [
-    {
-      "name": "Avraam Mavridis",
-      "email": "avr.mav@gmail.com"
-    }
-  ],
+  "author": "Cypress",
   "license": "MIT",
   "devDependencies": {
     "babel-cli": "^6.26.0",
