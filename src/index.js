@@ -48,8 +48,12 @@ function getAllSelectors( el, selectors, attributesToIgnore )
 function testUniqueness( element, selector )
 {
   const { parentNode } = element;
-  const elements = parentNode.querySelectorAll( selector );
-  return elements.length === 1 && elements[ 0 ] === element;
+  try {
+    const elements = parentNode.querySelectorAll( selector );
+    return elements.length === 1 && elements[0] === element;
+  } catch (e) {
+    return false
+  }
 }
 
 /**
@@ -167,31 +171,45 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
  * @api private
  */
 
-export default function unique( el, options={} )
-{
-  const { selectorTypes=['id', 'class', 'tag', 'nth-child'], attributesToIgnore= ['id', 'class', 'length'] } = options;
+export default function unique( el, options={} ) {
+  const { 
+    selectorTypes=['id', 'class', 'tag', 'nth-child'], 
+    attributesToIgnore= ['id', 'class', 'length'],
+    selectorCache,
+    isUniqueCache
+  } = options;
   const allSelectors = [];
-  const parents = getParents( el );
 
-  for( let elem of parents )
-  {
-    const selector = getUniqueSelector( elem, selectorTypes, attributesToIgnore );
-    if( Boolean( selector ) )
-    {
-      allSelectors.push( selector );
-    }
-  }
+  let currentElement = el
+  while (currentElement) {
+    let selector = selectorCache ? selectorCache.get(currentElement) : undefined
 
-  const selectors = [];
-  for( let it of allSelectors )
-  {
-    selectors.unshift( it );
-    const selector = selectors.join( ' > ' );
-    if( isUnique( el, selector ) )
-    {
-      return selector;
+    if (!selector) {
+      selector = getUniqueSelector(
+        currentElement,
+        selectorTypes,
+        attributesToIgnore
+      )
+      if (selectorCache) {
+        selectorCache.set(currentElement, selector)
+       }
+     }
+
+    allSelectors.unshift(selector)
+    const maybeUniqueSelector = allSelectors.join(' > ')
+    let isUniqueSelector = isUniqueCache ? isUniqueCache.get(maybeUniqueSelector) : undefined
+    if (isUniqueSelector === undefined) {
+      isUniqueSelector = isUnique(el, maybeUniqueSelector)
+      if (isUniqueCache) {
+        isUniqueCache.set(maybeUniqueSelector, isUniqueSelector)
+      }
     }
-  }
+
+    if (isUniqueSelector) {
+      return maybeUniqueSelector
+    }
+    currentElement = currentElement.parentNode
+   }
 
   return null;
 }
