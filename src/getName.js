@@ -1,5 +1,3 @@
-import 'css.escape';
-
 /**
  * Returns the `name` attribute of the element (if one exists)
  * @param  { Object } element
