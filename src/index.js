@@ -6,6 +6,7 @@ import { getID } from './getID';
 import { getClassSelectors } from './getClasses';
 import { getCombinations } from './getCombinations';
 import { getAttributes } from './getAttributes';
+import { getName } from './getName'
 import { getNthChild } from './getNthChild';
 import { getTag } from './getTag';
 import { isUnique } from './isUnique';
@@ -28,6 +29,7 @@ function getAllSelectors( el, selectors, attributesToIgnore )
       'attributes' : elem => getAttributes( elem, attributesToIgnore ),
       'class'      : getClassSelectors,
       'id'         : getID,
+      'name'       : getName,
     };
 
   return selectors
@@ -135,6 +137,7 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
     {
       case 'data' :
       case 'id' :
+      case 'name':
       case 'tag':
         if ( testUniqueness( element, selector ) )
         {
@@ -173,7 +176,7 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
 
 export default function unique( el, options={} ) {
   const { 
-    selectorTypes=['id', 'class', 'tag', 'nth-child'], 
+    selectorTypes=['id', 'name', 'class', 'tag', 'nth-child'], 
     attributesToIgnore= ['id', 'class', 'length'],
     selectorCache,
     isUniqueCache
