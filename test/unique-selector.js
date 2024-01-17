@@ -143,4 +143,25 @@ describe( 'Unique Selector Tests', () =>
     expect( uniqueSelector ).to.equal( '[data-foo]' );
   } );
 
+  describe('name', () => {
+    beforeEach(() => {
+      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+    })
+
+    it( 'with value', () =>
+    {
+      $( 'body' ).append( '<div name="so" class="test3"></div>' );
+      const findNode = $( 'body' ).find( '.test3' ).get( 0 );
+      const uniqueSelector = unique( findNode );
+      expect( uniqueSelector ).to.equal( '[name="so"]' );
+    } );
+
+    it( 'without value', () =>
+    {
+      $( 'body' ).append( '<div name class="test3"></div>' );
+      const findNode = $( 'body' ).find( '.test3' ).get( 0 );
+      const uniqueSelector = unique( findNode );
+      expect( uniqueSelector ).to.equal( '.test3' );
+    } );
+  })
 } );
