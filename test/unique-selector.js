@@ -107,41 +107,62 @@ describe( 'Unique Selector Tests', () =>
     expect( uniqueSelector ).to.equal( '[test="5"]' );
   } );
 
-  it( 'data-foo', () =>
-  {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
-    $( 'body' ).append( '<div data-foo="so" class="test6"></div>' );
-    const findNode = $( 'body' ).find( '.test6' ).get( 0 );
-    const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo'] } );
-    expect( uniqueSelector ).to.equal( '[data-foo="so"]' );
-  } );
+  describe('data attribute', () => {
+    it( 'data-foo', () =>
+    {
+      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+      $( 'body' ).append( '<div data-foo="so" class="test6"></div>' );
+      const findNode = $( 'body' ).find( '.test6' ).get( 0 );
+      const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo'] } );
+      expect( uniqueSelector ).to.equal( '[data-foo="so"]' );
+    } );
 
-  it( 'data-foo-bar-baz', () =>
-  {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
-    $( 'body' ).append( '<div data-foo-bar-baz="so" class="test6"></div>' );
-    const findNode = $( 'body' ).find( '.test6' ).get( 0 );
-    const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo-bar-baz'] } );
-    expect( uniqueSelector ).to.equal( '[data-foo-bar-baz="so"]' );
-  } );
+    it( 'data-foo-bar-baz', () =>
+    {
+      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+      $( 'body' ).append( '<div data-foo-bar-baz="so" class="test6"></div>' );
+      const findNode = $( 'body' ).find( '.test6' ).get( 0 );
+      const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo-bar-baz'] } );
+      expect( uniqueSelector ).to.equal( '[data-foo-bar-baz="so"]' );
+    } );
 
-  it( 'data-foo-bar with quotes', () =>
-  {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
-    $( 'body' ).append( '<div data-foo-bar="button 123" class="test7"></div>' );
-    const findNode = $( 'body' ).find( '.test7' ).get( 0 );
-    const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo-bar'] } );
-    expect( uniqueSelector ).to.equal( '[data-foo-bar="button 123"]' );
-  } );
+    it( 'data-foo-bar with quotes', () =>
+    {
+      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+      $( 'body' ).append( '<div data-foo-bar="button 123" class="test7"></div>' );
+      const findNode = $( 'body' ).find( '.test7' ).get( 0 );
+      const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo-bar'] } );
+      expect( uniqueSelector ).to.equal( '[data-foo-bar="button 123"]' );
+    } );
 
-  it( 'data-foo without value', () =>
-  {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
-    $( 'body' ).append( '<div data-foo class="test7"></div>' );
-    const findNode = $( 'body' ).find( '.test7' ).get( 0 );
-    const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo'] } );
-    expect( uniqueSelector ).to.equal( '[data-foo]' );
-  } );
+    it( 'data-foo without value', () =>
+    {
+      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+      $( 'body' ).append( '<div data-foo class="test7"></div>' );
+      const findNode = $( 'body' ).find( '.test7' ).get( 0 );
+      const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo'] } );
+      expect( uniqueSelector ).to.equal( '[data-foo]' );
+    } );
+  });
+
+  describe('standard attribute', () => {
+    it('attribute without value', () => {
+      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+      $( 'body' ).append( '<div contenteditable class="test8"></div>' );
+      const findNode = $( 'body' ).find( '.test8' ).get( 0 );
+      const uniqueSelector = unique( findNode, { selectorTypes : ['attribute-contenteditable'] } );
+      expect( uniqueSelector ).to.equal( '[contenteditable]' );
+    })
+    
+    it('attribute with value', () => {
+      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+      $( 'body' ).append( '<div role="button" class="test9"></div>' );
+      const findNode = $( 'body' ).find( '.test9' ).get( 0 );
+      const uniqueSelector = unique( findNode, { selectorTypes : ['attribute-role'] } );
+      expect( uniqueSelector ).to.equal( '[role="button"]' );
+    })
+  })
+  
 
   describe('name', () => {
     beforeEach(() => {
