@@ -11,9 +11,10 @@ import { getNthChild } from './getNthChild';
 import { getTag } from './getTag';
 import { isUnique } from './isUnique';
 import { getParents } from './getParents';
-import { getData } from './getData';
+import { getAttribute } from './getAttribute';
 
-const dataRegex = /^data-(.+)/;
+const dataRegex = /^data-.+/;
+const attrRegex = /^attribute:(.+)/m;
 
 /**
  * Returns all the selectors of the element
@@ -33,7 +34,7 @@ function getAllSelectors( el, selectors, attributesToIgnore )
     };
 
   return selectors
-  .filter( ( selector ) => !dataRegex.test( selector ) )
+  .filter( ( selector ) => !dataRegex.test( selector ) && !attrRegex.test( selector ) )
   .reduce( ( res, next ) =>
   {
     res[ next ] = funcs[ next ]( el );
@@ -119,15 +120,18 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
     let selector = elementSelectors[ selectorType ];
 
     // if we are a data attribute
-    if ( dataRegex.test( selectorType ) )
+    const isDataAttributeSelectorType = dataRegex.test(selectorType)
+    const isAttributeSelectorType = !isDataAttributeSelectorType && attrRegex.test(selectorType)
+    if ( isDataAttributeSelectorType || isAttributeSelectorType )
     {
-      const dataSelector = getData( selectorType, attributes );
+      const attributeToQuery = isDataAttributeSelectorType ? selectorType : selectorType.replace(attrRegex, '$1')
+      const attributeSelector = getAttribute( attributeToQuery, attributes );
 
-      // if we found a selector via data attributes
-      if ( dataSelector )
+      // if we found a selector via attribute
+      if ( attributeSelector )
       {
-        selector = dataSelector;
-        selectorType = 'data';
+        selector = attributeSelector;
+        selectorType = 'attribute';
       }
     }
 
@@ -135,7 +139,7 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
 
     switch ( selectorType )
     {
-      case 'data' :
+      case 'attribute' :
       case 'id' :
       case 'name':
       case 'tag':

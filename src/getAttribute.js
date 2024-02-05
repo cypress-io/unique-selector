@@ -1,11 +1,11 @@
 /**
- * Returns the data-{dataAttr} selector of the element
- * @param  { String } selectorType - The type of selector to return.
+ * Returns the {attr} selector of the element
+ * @param  { String } selectorType - The attribute selector to return.
  * @param  { String } attributes - The attributes of the element.
- * @return { String | null } - The data-{dataAttr} selector of the element.
+ * @return { String | null } - The {attr} selector of the element.
  */
 
-export const getData = ( selectorType, attributes ) =>
+export const getAttribute = ( selectorType, attributes ) =>
 {
   for ( let i = 0; i < attributes.length; i++ )
   {
