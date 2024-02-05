@@ -14,7 +14,7 @@ import { getParents } from './getParents';
 import { getAttribute } from './getAttribute';
 
 const dataRegex = /^data-.+/;
-const attrRegex = /^attribute-(.+)/m;
+const attrRegex = /^attribute:(.+)/m;
 
 /**
  * Returns all the selectors of the element

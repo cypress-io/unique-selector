@@ -150,7 +150,7 @@ describe( 'Unique Selector Tests', () =>
       $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
       $( 'body' ).append( '<div contenteditable class="test8"></div>' );
       const findNode = $( 'body' ).find( '.test8' ).get( 0 );
-      const uniqueSelector = unique( findNode, { selectorTypes : ['attribute-contenteditable'] } );
+      const uniqueSelector = unique( findNode, { selectorTypes : ['attribute:contenteditable'] } );
       expect( uniqueSelector ).to.equal( '[contenteditable]' );
     })
     
@@ -158,7 +158,7 @@ describe( 'Unique Selector Tests', () =>
       $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
       $( 'body' ).append( '<div role="button" class="test9"></div>' );
       const findNode = $( 'body' ).find( '.test9' ).get( 0 );
-      const uniqueSelector = unique( findNode, { selectorTypes : ['attribute-role'] } );
+      const uniqueSelector = unique( findNode, { selectorTypes : ['attribute:role'] } );
       expect( uniqueSelector ).to.equal( '[role="button"]' );
     })
   })
