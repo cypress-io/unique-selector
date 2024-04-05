@@ -11,7 +11,7 @@ import { getNthChild } from './getNthChild';
 import { getTag } from './getTag';
 import { isUnique } from './isUnique';
 import { getParents } from './getParents';
-import { getAttribute } from './getAttribute';
+import { getAttributeSelector } from './getAttribute';
 
 const dataRegex = /^data-.+/;
 const attrRegex = /^attribute:(.+)/m;
@@ -21,20 +21,31 @@ const attrRegex = /^attribute:(.+)/m;
  * @param  { Object } element
  * @return { Object }
  */
-function getAllSelectors( el, selectors, attributesToIgnore )
+function getAllSelectors( el, selectors, attributesToIgnore, filters )
 {
+  const consolidatedAttributesToIgnore = [...attributesToIgnore]
+  const nonAttributeSelectors = []
+  for (const selectorType of selectors) {
+    if (dataRegex.test(selectorType)) {
+      consolidatedAttributesToIgnore.push(selectorType)
+    } else if (attrRegex.test(selectorType)) {
+      consolidatedAttributesToIgnore.push(selectorType.replace(attrRegex, '$1'))
+    } else {
+      nonAttributeSelectors.push(selectorType)
+    }
+  }
+
   const funcs =
     {
-      'tag'        : getTag,
-      'nth-child'  : getNthChild,
-      'attributes' : elem => getAttributes( elem, attributesToIgnore ),
-      'class'      : getClassSelectors,
-      'id'         : getID,
-      'name'       : getName,
+      'tag'        : elem => getTag( elem, filters.tag ),
+      'nth-child'  : elem => getNthChild( elem, filters.nthChild ),
+      'attributes' : elem => getAttributes( elem, consolidatedAttributesToIgnore, filters.attributes ),
+      'class'      : elem => getClassSelectors( elem, filters.class ),
+      'id'         : elem => getID( elem, filters.id ),
+      'name'       : elem => getName (elem, filters.name ),
     };
 
-  return selectors
-  .filter( ( selector ) => !dataRegex.test( selector ) && !attrRegex.test( selector ) )
+  return nonAttributeSelectors
   .reduce( ( res, next ) =>
   {
     res[ next ] = funcs[ next ]( el );
@@ -107,13 +118,11 @@ function getUniqueCombination( element, items, tag )
  * @param  { Array } options
  * @return { String }
  */
-function getUniqueSelector( element, selectorTypes, attributesToIgnore )
+function getUniqueSelector( element, selectorTypes, attributesToIgnore, filters )
 {
   let foundSelector;
 
-  const attributes = [...element.attributes];
-
-  const elementSelectors = getAllSelectors( element, selectorTypes, attributesToIgnore );
+  const elementSelectors = getAllSelectors( element, selectorTypes, attributesToIgnore, filters );
 
   for( let selectorType of selectorTypes )
   {
@@ -125,12 +134,13 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
     if ( isDataAttributeSelectorType || isAttributeSelectorType )
     {
       const attributeToQuery = isDataAttributeSelectorType ? selectorType : selectorType.replace(attrRegex, '$1')
-      const attributeSelector = getAttribute( attributeToQuery, attributes );
+      const attributeValue = element.getAttribute(attributeToQuery)
+      const attributeFilter = filters[selectorType];
 
       // if we found a selector via attribute
-      if ( attributeSelector )
+      if ( attributeValue !== null && (!attributeFilter || attributeFilter(selectorType, attributeToQuery, attributeValue)) )
       {
-        selector = attributeSelector;
+        selector = getAttributeSelector( element, attributeToQuery );
         selectorType = 'attribute';
       }
     }
@@ -174,6 +184,15 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore )
  * Generate unique CSS selector for given DOM element
  *
  * @param {Element} el
+ * @param {Object} options (optional) Customize various behaviors of selector generation
+ * @param {String[]} options.selectorTypes Specify the set of traits to leverage when building selectors in precedence order
+ * @param {String[]} options.attributesToIgnore Specify a set of attributes to *not* leverage when building selectors
+ * @param {Object} options.filters Specify a set of filter functions to conditionally reject various traits when building selectors. Keys correspond to a `selectorTypes` entry, values should be a function accepting three parameters:
+ * * selectorType: The selector type/category being generated
+ * * key: The key being evaluated - this will typically match the `selectorType` except in aggregate types like `attributes`
+ * * value: The value to consider. Returning `true` will allow its use in selector generation, `false` will prevent.
+ * @param {Map<Element, String>} options.selectorCache Provide a cache to improve performance of repeated selector generation - it is the responsibility of the caller to handle cache invalidation. Caching is performed using the input Element as key. This cache handles Element -> Selector caching.
+ * @param {Map<String, Boolean>} options.isUniqueCache Provide a cache to improve performance of repeated selector generation - it is the responsibility of the caller to handle cache invalidation. Caching is performed using the input Element as key. This cache handles Selector -> isUnique caching.
  * @return {String}
  * @api private
  */
@@ -182,6 +201,7 @@ export default function unique( el, options={} ) {
   const { 
     selectorTypes=['id', 'name', 'class', 'tag', 'nth-child'], 
     attributesToIgnore= ['id', 'class', 'length'],
+    filters = {},
     selectorCache,
     isUniqueCache
   } = options;
@@ -195,7 +215,8 @@ export default function unique( el, options={} ) {
       selector = getUniqueSelector(
         currentElement,
         selectorTypes,
-        attributesToIgnore
+        attributesToIgnore,
+        filters
       )
       if (selectorCache) {
         selectorCache.set(currentElement, selector)
