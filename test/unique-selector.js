@@ -6,10 +6,12 @@ const $ = require( 'jquery' )( (new JSDOM()).window );
 
 describe( 'Unique Selector Tests', () =>
 {
+  beforeEach(() => {
+    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
+  })
 
   it( 'ID', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
     $( 'body' ).append( '<div id="so" class="test3"></div>' );
     const findNode = $( 'body' ).find( '.test3' ).get( 0 );
     const uniqueSelector = unique( findNode );
@@ -18,16 +20,31 @@ describe( 'Unique Selector Tests', () =>
 
   it( 'ID that needs escaping', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
     $( 'body' ).append( '<div id="123" class="test3"></div>' );
     const findNode = $( 'body' ).find( '.test3' ).get( 0 );
     const uniqueSelector = unique( findNode );
     expect( uniqueSelector ).to.equal( '#\\31 23' );
   } );
 
+  it('ID filters appropriately', () => {
+    const filters = {
+      'id': (type, key, value) => {
+        return /oo/.test(value)
+      }
+    }
+    let el = $.parseHTML( '<div id="foo"></div>' )[0];
+    $(el).appendTo('body')
+    let uniqueSelector = unique( el, { filters } );
+    expect( uniqueSelector ).to.equal( '#foo' );
+
+    el = $.parseHTML( '<div id="bar"></div>' )[0];
+    $(el).appendTo('body')
+    uniqueSelector = unique( el, { filters } );
+    expect( uniqueSelector ).to.equal( 'body > :nth-child(2)' );
+  });
+
   it( 'Class', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
     $( 'body' ).append( '<div class="test2"></div>' );
     const findNode = $( 'body' ).find( '.test2' ).get( 0 );
     const uniqueSelector = unique( findNode );
@@ -36,7 +53,6 @@ describe( 'Unique Selector Tests', () =>
 
   it( 'Class that needs escaping', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
     $( 'body' ).append( '<div class="@test test2"></div>' );
     const findNode = $( 'body' ).find( '.test2' ).get( 0 );
     const uniqueSelector = unique( findNode );
@@ -45,7 +61,6 @@ describe( 'Unique Selector Tests', () =>
 
   it( 'Classes', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
     $( 'body' ).append( '<div class="test2"></div><div class="test2"></div>' );
     const findNode = $( 'body' ).find( '.test2' ).get( 0 );
     const uniqueSelector = unique( findNode );
@@ -54,7 +69,6 @@ describe( 'Unique Selector Tests', () =>
 
   it( 'Classes', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
     $( 'body' ).append( '<div class="test2 ca cb cc cd cx"></div><div class="test2 ca cb cc cd ce"></div><div class="test2 ca cb cc cd ce"></div><div class="test2 ca cb cd ce cf cx"></div>' );
     const findNode = $( 'body' ).find( '.test2' ).get( 0 );
     const uniqueSelector = unique( findNode );
@@ -63,16 +77,31 @@ describe( 'Unique Selector Tests', () =>
 
   it( 'Classes with newline', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
     $( 'body' ).append( '<div class="test2\n ca\n cb\n cc\n cd\n cx"></div><div class="test2\n ca\n cb\n cc\n cd\n ce"></div><div class="test2\n ca\n cb\n cc\n cd\n ce"></div><div class="test2\n ca\n cb\n cd\n ce\n cf\n cx"></div>' );
     const findNode = $( 'body' ).find( '.test2' ).get( 0 );
     const uniqueSelector = unique( findNode );
     expect( uniqueSelector ).to.equal( '.cc.cx' );
   } );
 
+  it('Classes filters appropriately', () => {
+    const filters = {
+      'class': (type, key, value) => {
+        return value.startsWith('a')
+      }
+    }
+    let el = $.parseHTML( '<div class="a1"></div>' )[0];
+    $(el).appendTo('body')
+    let uniqueSelector = unique( el, { filters } );
+    expect( uniqueSelector ).to.equal( '.a1' );
+
+    el = $.parseHTML( '<div class="b1 a2"></div>' )[0];
+    $(el).appendTo('body')
+    uniqueSelector = unique( el, { filters } );
+    expect( uniqueSelector ).to.equal( '.a2' );
+  });
+
   it( 'Tag', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
     $( 'body' ).append( '<div class="test2"><span></span></div><div class="test2"></div>' );
     const findNode = $( '.test2' ).find( 'span' ).get( 0 );
     const uniqueSelector = unique( findNode );
@@ -82,7 +111,6 @@ describe( 'Unique Selector Tests', () =>
 
   it( 'Tag', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
     $( 'body' ).append( '<div class="test5"><span></span></div><div class="test5"><span></span></div>' );
     const findNode = $( '.test5' ).find( 'span' ).get( 0 );
     const uniqueSelector = unique( findNode );
@@ -91,7 +119,6 @@ describe( 'Unique Selector Tests', () =>
 
   it( 'Tag', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
     $( 'body' ).append( '<div class="test5"><span><ul><li><a></a></li></ul></span></div><div class="test5"><span></span></div>' );
     const findNode = $( '.test5' ).find( 'a' ).get( 0 );
     const uniqueSelector = unique( findNode );
@@ -100,17 +127,31 @@ describe( 'Unique Selector Tests', () =>
 
   it( 'Attributes', () =>
   {
-    $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
     $( 'body' ).append( '<div class="test5" test="5"></div>' );
     const findNode = $( '.test5' ).get( 0 );
     const uniqueSelector = unique( findNode, { selectorTypes : ['attributes'] } );
     expect( uniqueSelector ).to.equal( '[test="5"]' );
   } );
 
+  it('Attributes does not consider specified attribute matchers', () => {
+    $( 'body' ).append( '<div a="1" data-foo="1"></div>' );
+    const el = $( 'div' ).get( 0 );
+    // Add selectorTypes for `data-foo` and `attribute:a` but use filters to reject their use
+    // `attributes` selector type should *not* use those attributes since they were considered
+    // by other selectorType generators
+    const uniqueSelector = unique( el, {
+      selectorTypes : ['data-foo', 'attribute:a', 'attributes', 'nth-child'],
+      filters: {
+        'data-foo': () => false,
+        'attribute:a': () => false,
+      }
+    } );
+    expect( uniqueSelector ).to.equal( ':nth-child(2) > :nth-child(1)' );
+  });
+
   describe('data attribute', () => {
     it( 'data-foo', () =>
     {
-      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
       $( 'body' ).append( '<div data-foo="so" class="test6"></div>' );
       const findNode = $( 'body' ).find( '.test6' ).get( 0 );
       const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo'] } );
@@ -119,7 +160,6 @@ describe( 'Unique Selector Tests', () =>
 
     it( 'data-foo-bar-baz', () =>
     {
-      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
       $( 'body' ).append( '<div data-foo-bar-baz="so" class="test6"></div>' );
       const findNode = $( 'body' ).find( '.test6' ).get( 0 );
       const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo-bar-baz'] } );
@@ -128,7 +168,6 @@ describe( 'Unique Selector Tests', () =>
 
     it( 'data-foo-bar with quotes', () =>
     {
-      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
       $( 'body' ).append( '<div data-foo-bar="button 123" class="test7"></div>' );
       const findNode = $( 'body' ).find( '.test7' ).get( 0 );
       const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo-bar'] } );
@@ -137,17 +176,32 @@ describe( 'Unique Selector Tests', () =>
 
     it( 'data-foo without value', () =>
     {
-      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
       $( 'body' ).append( '<div data-foo class="test7"></div>' );
       const findNode = $( 'body' ).find( '.test7' ).get( 0 );
       const uniqueSelector = unique( findNode, { selectorTypes : ['data-foo'] } );
       expect( uniqueSelector ).to.equal( '[data-foo]' );
     } );
+
+    it('filters appropriately', () => {
+      const filters = {
+        'data-foo': (type, key, value) => {
+          return value === 'abc'
+        }
+      }
+      let el = $.parseHTML( '<div data-foo="abc" class="test1"></div>' )[0];
+      $(el).appendTo('body')
+      let uniqueSelector = unique( el, { filters, selectorTypes : ['data-foo', 'class'] } );
+      expect( uniqueSelector ).to.equal( '[data-foo="abc"]' );
+
+      el = $.parseHTML( '<div data-foo="def" class="test2"></div>' )[0];
+      $(el).appendTo('body')
+      uniqueSelector = unique( el, { filters, selectorTypes : ['data-foo', 'class'] } );
+      expect( uniqueSelector ).to.equal( '.test2' );
+    })
   });
 
   describe('standard attribute', () => {
     it('attribute without value', () => {
-      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
       $( 'body' ).append( '<div contenteditable class="test8"></div>' );
       const findNode = $( 'body' ).find( '.test8' ).get( 0 );
       const uniqueSelector = unique( findNode, { selectorTypes : ['attribute:contenteditable'] } );
@@ -155,20 +209,31 @@ describe( 'Unique Selector Tests', () =>
     })
     
     it('attribute with value', () => {
-      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
       $( 'body' ).append( '<div role="button" class="test9"></div>' );
       const findNode = $( 'body' ).find( '.test9' ).get( 0 );
       const uniqueSelector = unique( findNode, { selectorTypes : ['attribute:role'] } );
       expect( uniqueSelector ).to.equal( '[role="button"]' );
     })
+
+    it('filters appropriately', () => {
+      const filters = {
+        'attribute:role': (type, key, value) => {
+          return value === 'abc'
+        }
+      }
+      let el = $.parseHTML( '<div role="abc" class="test1"></div>' )[0];
+      $(el).appendTo('body')
+      let uniqueSelector = unique( el, { filters, selectorTypes : ['attribute:role', 'class'] } );
+      expect( uniqueSelector ).to.equal( '[role="abc"]' );
+
+      el = $.parseHTML( '<div role="def" class="test2"></div>' )[0];
+      $(el).appendTo('body')
+      uniqueSelector = unique( el, { filters, selectorTypes : ['attribute:role', 'class'] } );
+      expect( uniqueSelector ).to.equal( '.test2' );
+    })
   })
   
-
   describe('name', () => {
-    beforeEach(() => {
-      $( 'body' ).get( 0 ).innerHTML = ''; // Clear previous appends
-    })
-
     it( 'with value', () =>
     {
       $( 'body' ).append( '<div name="so" class="test3"></div>' );
@@ -184,5 +249,22 @@ describe( 'Unique Selector Tests', () =>
       const uniqueSelector = unique( findNode );
       expect( uniqueSelector ).to.equal( '.test3' );
     } );
+
+    it('filters appropriately', () => {
+      const filters = {
+        'name': (type, key, value) => {
+          return value === 'abc'
+        }
+      }
+      let el = $.parseHTML( '<div name="abc" class="test1"></div>' )[0];
+      $(el).appendTo('body')
+      let uniqueSelector = unique( el, { filters } );
+      expect( uniqueSelector ).to.equal( '[name="abc"]' );
+
+      el = $.parseHTML( '<div name="def" class="test2"></div>' )[0];
+      $(el).appendTo('body')
+      uniqueSelector = unique( el, { filters } );
+      expect( uniqueSelector ).to.equal( '.test2' );
+    })
   })
 } );
