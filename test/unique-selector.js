@@ -27,19 +27,20 @@ describe( 'Unique Selector Tests', () =>
   } );
 
   it('ID filters appropriately', () => {
-    const filters = {
-      'id': (type, key, value) => {
+    const filter = (type, key, value) => {
+      if (type === 'attribute' && key === 'id') {
         return /oo/.test(value)
       }
+      return true
     }
     let el = $.parseHTML( '<div id="foo"></div>' )[0];
     $(el).appendTo('body')
-    let uniqueSelector = unique( el, { filters } );
+    let uniqueSelector = unique( el, { filter } );
     expect( uniqueSelector ).to.equal( '#foo' );
 
     el = $.parseHTML( '<div id="bar"></div>' )[0];
     $(el).appendTo('body')
-    uniqueSelector = unique( el, { filters } );
+    uniqueSelector = unique( el, { filter } );
     expect( uniqueSelector ).to.equal( 'body > :nth-child(2)' );
   });
 
@@ -84,19 +85,20 @@ describe( 'Unique Selector Tests', () =>
   } );
 
   it('Classes filters appropriately', () => {
-    const filters = {
-      'class': (type, key, value) => {
+    const filter = (type, key, value) => {
+      if (type === 'attribute' && key === 'class') {
         return value.startsWith('a')
       }
+      return true
     }
     let el = $.parseHTML( '<div class="a1"></div>' )[0];
     $(el).appendTo('body')
-    let uniqueSelector = unique( el, { filters } );
+    let uniqueSelector = unique( el, { filter } );
     expect( uniqueSelector ).to.equal( '.a1' );
 
     el = $.parseHTML( '<div class="b1 a2"></div>' )[0];
     $(el).appendTo('body')
-    uniqueSelector = unique( el, { filters } );
+    uniqueSelector = unique( el, { filter } );
     expect( uniqueSelector ).to.equal( '.a2' );
   });
 
@@ -141,9 +143,11 @@ describe( 'Unique Selector Tests', () =>
     // by other selectorType generators
     const uniqueSelector = unique( el, {
       selectorTypes : ['data-foo', 'attribute:a', 'attributes', 'nth-child'],
-      filters: {
-        'data-foo': () => false,
-        'attribute:a': () => false,
+      filter: (type, key, value) => {
+        if (type === 'attribute' && ['data-foo', 'a'].includes(key)) {
+          return false
+        }
+        return true
       }
     } );
     expect( uniqueSelector ).to.equal( ':nth-child(2) > :nth-child(1)' );
@@ -183,19 +187,20 @@ describe( 'Unique Selector Tests', () =>
     } );
 
     it('filters appropriately', () => {
-      const filters = {
-        'data-foo': (type, key, value) => {
+      const filter = (type, key, value) => {
+        if (type === 'attribute' && key === 'data-foo') {
           return value === 'abc'
         }
+        return true
       }
       let el = $.parseHTML( '<div data-foo="abc" class="test1"></div>' )[0];
       $(el).appendTo('body')
-      let uniqueSelector = unique( el, { filters, selectorTypes : ['data-foo', 'class'] } );
+      let uniqueSelector = unique( el, { filter, selectorTypes : ['data-foo', 'class'] } );
       expect( uniqueSelector ).to.equal( '[data-foo="abc"]' );
 
       el = $.parseHTML( '<div data-foo="def" class="test2"></div>' )[0];
       $(el).appendTo('body')
-      uniqueSelector = unique( el, { filters, selectorTypes : ['data-foo', 'class'] } );
+      uniqueSelector = unique( el, { filter, selectorTypes : ['data-foo', 'class'] } );
       expect( uniqueSelector ).to.equal( '.test2' );
     })
   });
@@ -216,19 +221,20 @@ describe( 'Unique Selector Tests', () =>
     })
 
     it('filters appropriately', () => {
-      const filters = {
-        'attribute:role': (type, key, value) => {
+      const filter = (type, key, value) => {
+        if (type === 'attribute' && key === 'role') {
           return value === 'abc'
         }
+        return true
       }
       let el = $.parseHTML( '<div role="abc" class="test1"></div>' )[0];
       $(el).appendTo('body')
-      let uniqueSelector = unique( el, { filters, selectorTypes : ['attribute:role', 'class'] } );
+      let uniqueSelector = unique( el, { filter, selectorTypes : ['attribute:role', 'class'] } );
       expect( uniqueSelector ).to.equal( '[role="abc"]' );
 
       el = $.parseHTML( '<div role="def" class="test2"></div>' )[0];
       $(el).appendTo('body')
-      uniqueSelector = unique( el, { filters, selectorTypes : ['attribute:role', 'class'] } );
+      uniqueSelector = unique( el, { filter, selectorTypes : ['attribute:role', 'class'] } );
       expect( uniqueSelector ).to.equal( '.test2' );
     })
   })
@@ -251,20 +257,44 @@ describe( 'Unique Selector Tests', () =>
     } );
 
     it('filters appropriately', () => {
-      const filters = {
-        'name': (type, key, value) => {
+      const filter = (type, key, value) => {
+        if (type === 'attribute' && key === 'name') {
           return value === 'abc'
         }
+        return true
       }
       let el = $.parseHTML( '<div name="abc" class="test1"></div>' )[0];
       $(el).appendTo('body')
-      let uniqueSelector = unique( el, { filters } );
+      let uniqueSelector = unique( el, { filter } );
       expect( uniqueSelector ).to.equal( '[name="abc"]' );
 
       el = $.parseHTML( '<div name="def" class="test2"></div>' )[0];
       $(el).appendTo('body')
-      uniqueSelector = unique( el, { filters } );
+      uniqueSelector = unique( el, { filter } );
       expect( uniqueSelector ).to.equal( '.test2' );
+    })
+  })
+
+  describe('nth-child', () => {
+    it( 'builds expected selector', () =>
+    {
+      $( 'body' ).append( '<div><div class="test-nth-child"></div></div>' );
+      const findNode = $( 'body' ).find( '.test-nth-child' ).get( 0 );
+      const uniqueSelector = unique( findNode, { selectorTypes : ['nth-child'] } );
+      expect( uniqueSelector ).to.equal( ':nth-child(2) > :nth-child(1) > :nth-child(1)' );
+    } );
+
+    it('filters appropriately', () => {
+      const filter = (type, key, value) => {
+        if (type === 'nth-child') {
+          return value !== 1
+        }
+        return true
+      }
+      $( 'body' ).append( '<div><span class="test-nth-child"></span></div>' )[0];
+      const findNode = $( 'body' ).find( '.test-nth-child' ).get( 0 );
+      const uniqueSelector = unique( findNode, { filter, selectorTypes : ['nth-child', 'tag'] } );
+      expect( uniqueSelector ).to.equal( 'span' );
     })
   })
 } );

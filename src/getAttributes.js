@@ -12,7 +12,7 @@ export function getAttributes( el, attributesToIgnore = ['id', 'class', 'length'
 
   return attrs.reduce( ( sum, next ) =>
   {
-    if ( ! ( attributesToIgnore.indexOf( next.nodeName ) > -1 ) && (!filter || filter('attributes', next.nodeName, next.value)) )
+    if ( ! ( attributesToIgnore.indexOf( next.nodeName ) > -1 ) && (!filter || filter('attribute', next.nodeName, next.value)) )
     {
       sum.push( `[${next.nodeName}="${next.value}"]` );
     }
