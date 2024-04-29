@@ -147,7 +147,7 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore, filter )
       // if we found a selector via attribute
       if ( attributeSelector )
       {
-        selector = getAttributeSelector( element, attributeToQuery, filter );
+        selector = attributeSelector
         selectorType = 'attribute';
       }
     }
