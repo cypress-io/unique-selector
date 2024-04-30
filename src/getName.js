@@ -8,7 +8,7 @@ export function getName( el, filter )
 {
   const name = el.getAttribute( 'name' );
 
-  if( name !== null && name !== '' && (!filter || filter('name', 'name', name)))
+  if( name !== null && name !== '' && (!filter || filter('attribute', 'name', name)))
   {
     return `[name="${name}"]`;
   }
