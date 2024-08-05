@@ -16,7 +16,7 @@ export function getClasses( el, filter )
 
   try {
     return Array.prototype.slice.call( el.classList )
-    .filter((cls) => !filter || filter('attribute', 'class', cls));
+    .filter((cls) => !filter || filter('class', 'class', cls));
   } catch (e) {
     let className = el.getAttribute( 'class' );
 

@@ -19,7 +19,7 @@ const attrRegex = /^attribute:(.+)/m;
 /**
  * @typedef Filter
  * @type {Function}
- * @param {string} type - the trait being considered ('attribute', 'tag', 'nth-child').
+ * @param {string} type - the trait being considered ('attribute', 'tag', 'nth-child'). As a special case, the `class` attribute is split on whitespace and each token passed individually with a `class` type.
  * @param {string} key - your trait key (for 'attribute' will be the attribute name, for others will typically be the same as 'type').
  * @param {string} value - the trait value.
  * @returns {boolean} whether this trait can be used when building the selector (true = allow). Defaults to 'true' if no value returned.

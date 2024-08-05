@@ -86,9 +86,11 @@ describe( 'Unique Selector Tests', () =>
 
   it('Classes filters appropriately', () => {
     const filter = (type, key, value) => {
-      if (type === 'attribute' && key === 'class') {
+      if (key === 'class') {
+        expect(type).to.eq('class')
         return value.startsWith('a')
       }
+      expect(type).not.to.eq('class')
       return true
     }
     let el = $.parseHTML( '<div class="a1"></div>' )[0];
