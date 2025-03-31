@@ -248,7 +248,11 @@ export default function unique( el, options={} ) {
     if (isUniqueSelector) {
       return maybeUniqueSelector
     }
-    currentElement = currentElement.parentNode
+
+    // Using parentElement here (rather than parentNode) to
+    // filter out any document/document fragment nodes that may
+    // be ancestors to elements within Shadow DOM trees.
+    currentElement = currentElement.parentElement
    }
 
   return null;
