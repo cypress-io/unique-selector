@@ -299,4 +299,50 @@ describe( 'Unique Selector Tests', () =>
       expect( uniqueSelector ).to.equal( 'span' );
     })
   })
+
+  describe('shadow dom', () => {
+    it( 'builds expected selector inside and outside shadow context', () => {
+      $( 'body' ).append( '<div id="shadow-host" class="shadow-host-class"></div>' );
+
+      const hostNode = $( '#shadow-host' ).get( 0 );
+  
+      const shadowRoot = hostNode.attachShadow({ mode: "open" })
+      const shadowElement = hostNode.ownerDocument.createElement('div')
+      shadowElement.innerHTML = `
+        <div id="inner-shadow-container">
+          <button id="shadow-button" class="shadow-button-class">Click Me</button>
+        </div>
+      `
+      shadowRoot.appendChild(shadowElement);
+    
+      const uniqueSelectorForHost = unique( hostNode );
+      expect( uniqueSelectorForHost ).to.equal( '#shadow-host' );
+    
+      const uniqueSelectorForShadowContent = unique ( shadowElement.querySelector('#shadow-button') )
+      expect( uniqueSelectorForShadowContent ).to.equal( '#shadow-button' );
+    })
+
+    it( 'builds unique selector scoped to shadow root', () => {
+      $( 'body' ).append( '<div id="shadow-host" class="shadow-host-class"></div>' );
+      $( 'body' ).append( '<button class="shadow-button-class">Click Me Third</button>' );
+
+      const hostNode = $( '#shadow-host' ).get( 0 );
+  
+      const shadowRoot = hostNode.attachShadow({ mode: "open" })
+      const shadowElement = hostNode.ownerDocument.createElement('div')
+      shadowElement.innerHTML = `
+        <div id="inner-shadow-container">
+          <button class="shadow-button-class">Click Me First</button>
+          <button class="shadow-button-class">Click Me Second</button>
+        </div>
+      `
+      shadowRoot.appendChild(shadowElement);
+        
+      const uniqueSelectorInRootDocument = unique( $( 'body' ).find( '.shadow-button-class' ).get( 0 ) );
+      expect( uniqueSelectorInRootDocument ).to.equal( '.shadow-button-class' );
+
+      const uniqueSelectorForShadowContent = unique ( shadowElement.querySelectorAll('.shadow-button-class')[0] )
+      expect( uniqueSelectorForShadowContent ).to.equal( '#inner-shadow-container > :nth-child(1)' );
+    })
+  })
 } );
