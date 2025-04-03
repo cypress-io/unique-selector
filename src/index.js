@@ -188,7 +188,9 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore, filter )
 }
 
 /**
- * Generate unique CSS selector for given DOM element
+ * Generate unique CSS selector for given DOM element. Selector uniqueness is determined based on the given element's root node. 
+ * Elements rendered within Shadow DOM will derive a selector that is unique within the associated ShadowRoot context. 
+ * Otherwise, a selector that is unique within the element's owning document will be derived.
  *
  * @param {Element} el
  * @param {Object} options (optional) Customize various behaviors of selector generation
@@ -200,7 +202,6 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore, filter )
  * @return {String}
  * @api private
  */
-
 export default function unique( el, options={} ) {
   const { 
     selectorTypes=['id', 'name', 'class', 'tag', 'nth-child'], 
