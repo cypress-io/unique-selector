@@ -15,6 +15,7 @@ This is particularly useful when tracking in custom variables in analytics:
         _gaq.push(['_trackEvent', 'Engagement', 'Click', selector]);
     }, false);
 
+Selector uniqueness is determined based on the given element's root node. Elements rendered within Shadow DOM will derive a selector unique within the associated ShadowRoot context. Otherwise, a selector unique within an element's owning document will be derived.
 
 Installation
 ------------
@@ -74,6 +75,11 @@ Eric Clemmons : [@ericclemmons](https://twitter.com/ericclemmons)
 
 Releases
 --------
+
+- v2.1.0
+  
+    - 
+
 - v0.1.0
 
     - Big refactor/rewrite using es6

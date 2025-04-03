@@ -1,8 +1,11 @@
 /**
- * Checks if the selector is unique
+ * Checks if the selector is unique. The selector is unique 
+ * if the elements root node (either its owner document, or a shadow root)
+ * has exactly one element matching the selector.
+ * 
  * @param  { Object } element
  * @param  { String } selector
- * @return { Array }
+ * @return { Boolean }
  */
 export function isUnique( el, selector )
 {
