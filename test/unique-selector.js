@@ -128,7 +128,7 @@ describe( 'Unique Selector Tests', () =>
     expect( uniqueSelector ).to.equal( 'a' );
   } );
 
-  it( 'Tag - filtered due to property override', () =>
+  it( 'Tag - fallback to nodeName', () =>
   {
     $( 'body' ).append(`
       <div class="test2">
@@ -154,8 +154,47 @@ describe( 'Unique Selector Tests', () =>
     expect(typeof formNode.tagName).to.not.equal('string')
 
     const uniqueSelector = unique( formNode );
-    expect( uniqueSelector ).to.equal( '.test2 > :nth-child(1)' );
+    // nodeName === 'form'
+    expect( uniqueSelector ).to.equal( 'form' );
   } );
+
+  it( 'Tag - ignored due to property override', () =>
+    {
+      $( 'body' ).append(`
+        <div class="test2">
+          <form action="" method="get">
+            <div class="form-example">
+              <label for="name">Enter your name: </label>
+              <input type="text" name="name" id="tagName" required />
+            </div>
+          </form>
+        </div>
+      `);
+  
+      const formNode = $( 'form' ).get( 0 );
+  
+      // JSDOM doesn't actually exhibit this behavior;
+      // forcing the test to behave as a browser does.
+      Object.defineProperty(formNode, 'tagName', {
+        get: () => {
+          return $( 'input#tagName' ).get( 0 );
+        }
+      })
+      Object.defineProperty(formNode, 'nodeName', {
+        get: () => {
+          return $( 'input#tagName' ).get( 0 );
+        }
+      })
+  
+      expect(typeof formNode.tagName).to.not.equal('string')
+      expect(typeof formNode.nodeName).to.not.equal('string')
+
+      const uniqueSelector = unique( formNode );
+      // with nodeName overridden, the isElement check will fail
+      // and the wildcard selector is returned for that element.
+      // This really shouldn't happen in practice.
+      expect( uniqueSelector ).to.equal( '.test2 > *' );
+  } );  
 
   it( 'Attributes', () =>
   {
