@@ -112,7 +112,6 @@ describe( 'Unique Selector Tests', () =>
     expect( uniqueSelector ).to.equal( 'span' );
   } );
 
-
   it( 'Tag', () =>
   {
     $( 'body' ).append( '<div class="test5"><span></span></div><div class="test5"><span></span></div>' );
@@ -127,6 +126,35 @@ describe( 'Unique Selector Tests', () =>
     const findNode = $( '.test5' ).find( 'a' ).get( 0 );
     const uniqueSelector = unique( findNode );
     expect( uniqueSelector ).to.equal( 'a' );
+  } );
+
+  it( 'Tag - filtered due to property override', () =>
+  {
+    $( 'body' ).append(`
+      <div class="test2">
+        <form action="" method="get">
+          <div class="form-example">
+            <label for="name">Enter your name: </label>
+            <input type="text" name="name" id="tagName" required />
+          </div>
+        </form>
+      </div>
+    `);
+
+    const formNode = $( 'form' ).get( 0 );
+
+    // JSDOM doesn't actually exhibit this behavior;
+    // forcing the test to behave as a browser does.
+    Object.defineProperty(formNode, 'tagName', {
+      get: () => {
+        return $( 'input#tagName' ).get( 0 );
+      }
+    })
+
+    expect(typeof formNode.tagName).to.not.equal('string')
+
+    const uniqueSelector = unique( formNode );
+    expect( uniqueSelector ).to.equal( '.test2 > :nth-child(1)' );
   } );
 
   it( 'Attributes', () =>
