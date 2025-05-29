@@ -4,13 +4,15 @@
  * @param { Function } filter
  * @return { String }
  */
-export function getName( el, filter )
-{
-  const name = el.getAttribute( 'name' );
+export function getName(el, filter) {
+  const name = el.getAttribute('name')
 
-  if( name !== null && name !== '' && (!filter || filter('attribute', 'name', name)))
-  {
-    return `[name="${name}"]`;
+  if (
+    name !== null &&
+    name !== '' &&
+    (!filter || filter('attribute', 'name', name))
+  ) {
+    return `[name="${name}"]`
   }
-  return null;
+  return null
 }
