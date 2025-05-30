@@ -6,6 +6,7 @@ import { getID } from './getID'
 import { getClassSelectors } from './getClasses'
 import { getCombinations } from './getCombinations'
 import { getAttributes } from './getAttributes'
+import { getDataAttributes } from './getDataAttributes'
 import { getName } from './getName'
 import { getNthChild } from './getNthChild'
 import { getTag } from './getTag'
@@ -35,7 +36,7 @@ function getAllSelectors(el, selectors, attributesToIgnore, filter) {
   const nonAttributeSelectors = []
   for (const selectorType of selectors) {
     if (dataRegex.test(selectorType)) {
-      consolidatedAttributesToIgnore.push(selectorType)
+      nonAttributeSelectors.push(selectorType)
     } else if (attrRegex.test(selectorType)) {
       consolidatedAttributesToIgnore.push(selectorType.replace(attrRegex, '$1'))
     } else {
@@ -48,12 +49,16 @@ function getAllSelectors(el, selectors, attributesToIgnore, filter) {
     'nth-child': (elem) => getNthChild(elem, filter),
     attributes: (elem) =>
       getAttributes(elem, consolidatedAttributesToIgnore, filter),
+    'data-attributes': (elem) => getDataAttributes(elem, filter),
     class: (elem) => getClassSelectors(elem, filter),
     id: (elem) => getID(elem, filter),
     name: (elem) => getName(elem, filter),
   }
 
   return nonAttributeSelectors.reduce((res, next) => {
+    if (next.startsWith('data-')) {
+      next = 'data-attributes'
+    }
     res[next] = funcs[next](el)
     return res
   }, {})
@@ -113,6 +118,53 @@ function getUniqueCombination(element, items, tag) {
 }
 
 /**
+ * Scores a selector based on its quality and specificity
+ * Higher scores are better
+ * @param { String } selector
+ * @return { Number }
+ */
+function scoreSelector(selector) {
+  if (!selector) return 0
+
+  // Base score
+  let score = 1
+
+  // Prefer attribute-based selectors over positional ones
+  if (selector.includes(':nth-child')) {
+    score -= 5
+  }
+
+  // Prioritize by selector type
+  if (selector.startsWith('#')) {
+    // ID selectors are the most specific and stable
+    score += 100
+  } else if (selector.startsWith('[data-id')) {
+    // data-id is almost as good as ID
+    score += 90
+  } else if (selector.startsWith('[data-')) {
+    // Other data attributes are good
+    score += 80
+  } else if (selector.startsWith('[name')) {
+    // name attribute is good
+    score += 70
+  } else if (selector.startsWith('[')) {
+    // Other attribute selectors
+    score += 60
+  } else if (selector.startsWith('.')) {
+    // Class selectors
+    score += 50
+  } else if (/^[a-z]+$/.test(selector)) {
+    // Tag selectors
+    score += 30
+  }
+
+  // Penalize long selectors
+  score -= selector.length / 10
+
+  return score
+}
+
+/**
  * Returns a uniqueSelector based on the passed options
  * @param  { DOM } element
  * @param  { Array } options
@@ -120,6 +172,7 @@ function getUniqueCombination(element, items, tag) {
  */
 function getUniqueSelector(element, selectorTypes, attributesToIgnore, filter) {
   let foundSelector
+  let candidates = []
 
   const elementSelectors = getAllSelectors(
     element,
@@ -159,11 +212,12 @@ function getUniqueSelector(element, selectorTypes, attributesToIgnore, filter) {
       case 'name':
       case 'tag':
         if (testUniqueness(element, selector)) {
-          return selector
+          candidates.push(selector)
         }
         break
       case 'class':
       case 'attributes':
+      case 'data-attributes':
         if (selector.length) {
           foundSelector = getUniqueCombination(
             element,
@@ -171,18 +225,27 @@ function getUniqueSelector(element, selectorTypes, attributesToIgnore, filter) {
             elementSelectors.tag
           )
           if (foundSelector) {
-            return foundSelector
+            candidates.push(foundSelector)
           }
         }
         break
 
       case 'nth-child':
-        return selector
+        candidates.push(selector)
+        break
 
       default:
         break
     }
   }
+
+  // Sort candidates by score and return the highest-scoring unique selector
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => scoreSelector(b) - scoreSelector(a))
+
+    return candidates[0]
+  }
+
   return '*'
 }
 
@@ -203,12 +266,20 @@ function getUniqueSelector(element, selectorTypes, attributesToIgnore, filter) {
  */
 export default function unique(el, options = {}) {
   const {
-    selectorTypes = ['id', 'name', 'class', 'tag', 'nth-child'],
+    selectorTypes = [
+      'data-attributes',
+      'id',
+      'name',
+      'class',
+      'tag',
+      'nth-child',
+    ],
     attributesToIgnore = ['id', 'class', 'length'],
     filter,
     selectorCache,
     isUniqueCache,
   } = options
+
   // If filter was provided wrap it to ensure a default value of `true` is returned if the provided function fails to return a value
   const normalizedFilter =
     filter &&
@@ -219,9 +290,27 @@ export default function unique(el, options = {}) {
       }
       return result
     }
-  const allSelectors = []
 
+  // Strategy 1: Try to find a direct unique selector for the element itself
+  const directSelector = getUniqueSelector(
+    el,
+    selectorTypes,
+    attributesToIgnore,
+    normalizedFilter
+  )
+
+  // If the direct selector is already good (not nth-child), use it
+  if (directSelector !== '*' && !directSelector.startsWith(':nth-child')) {
+    if (isUnique(el, directSelector)) {
+      return directSelector
+    }
+  }
+
+  // Strategy 2: Build a path of selectors if needed
+  const allSelectors = []
+  const candidateSelectors = []
   let currentElement = el
+
   while (currentElement) {
     let selector = selectorCache ? selectorCache.get(currentElement) : undefined
 
@@ -232,32 +321,75 @@ export default function unique(el, options = {}) {
         attributesToIgnore,
         normalizedFilter
       )
+
       if (selectorCache) {
         selectorCache.set(currentElement, selector)
       }
     }
 
     allSelectors.unshift(selector)
-    const maybeUniqueSelector = allSelectors.join(' > ')
+
+    // Try different combinations of selectors at each step to find optimal ones
+    for (let i = 0; i < allSelectors.length; i++) {
+      // Try single selector
+      const singleSelector = allSelectors[i]
+      if (singleSelector && isUnique(el, singleSelector)) {
+        candidateSelectors.push({
+          selector: singleSelector,
+          score: scoreSelector(singleSelector),
+        })
+      }
+
+      // Try with one parent
+      if (i < allSelectors.length - 1) {
+        const withParent = `${allSelectors[i + 1]} > ${singleSelector}`
+        if (isUnique(el, withParent)) {
+          candidateSelectors.push({
+            selector: withParent,
+            score: scoreSelector(withParent),
+          })
+        }
+      }
+    }
+
+    // Try the full path as it stands
+    const currentPath = allSelectors.join(' > ')
     let isUniqueSelector = isUniqueCache
-      ? isUniqueCache.get(maybeUniqueSelector)
+      ? isUniqueCache.get(currentPath)
       : undefined
+
     if (isUniqueSelector === undefined) {
-      isUniqueSelector = isUnique(el, maybeUniqueSelector)
+      isUniqueSelector = isUnique(el, currentPath)
       if (isUniqueCache) {
-        isUniqueCache.set(maybeUniqueSelector, isUniqueSelector)
+        isUniqueCache.set(currentPath, isUniqueSelector)
       }
     }
 
     if (isUniqueSelector) {
-      return maybeUniqueSelector
+      candidateSelectors.push({
+        selector: currentPath,
+        score: scoreSelector(currentPath),
+      })
     }
 
-    // Using parentElement here (rather than parentNode) to
-    // filter out any document/document fragment nodes that may
-    // be ancestors to elements within Shadow DOM trees.
-    currentElement = currentElement.parentElement
+    // If we have good candidates, pick the best one
+    if (candidateSelectors.length > 0) {
+      // Sort by score (highest first)
+      candidateSelectors.sort((a, b) => b.score - a.score)
+      return candidateSelectors[0].selector
+    }
+
+    // Move up the DOM tree
+    if (currentElement.parentElement) {
+      currentElement = currentElement.parentElement
+    } else {
+      // Only consider shadow root parent if it actually exists
+      const rootNode = currentElement.getRootNode()
+      currentElement =
+        rootNode && rootNode.nodeType === 11 ? rootNode.host : null
+    }
   }
 
-  return null
+  // If we still don't have a good selector, return the full path
+  return allSelectors.join(' > ')
 }
