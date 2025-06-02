@@ -11,8 +11,8 @@ import { getName } from './getName'
 import { getNthChild } from './getNthChild'
 import { getTag } from './getTag'
 import { isUnique } from './isUnique'
-import { getParents } from './getParents'
 import { getAttributeSelector } from './getAttribute'
+import { getPotentialUniqueSelector } from './getPotentialUniqueSelector'
 
 const dataRegex = /^data-.+/
 const attrRegex = /^attribute:(.+)/m
@@ -303,6 +303,18 @@ export default function unique(el, options = {}) {
   if (directSelector !== '*' && !directSelector.startsWith(':nth-child')) {
     if (isUnique(el, directSelector)) {
       return directSelector
+    } else {
+      const selector = getPotentialUniqueSelector(
+        el,
+        directSelector,
+        selectorTypes,
+        attributesToIgnore,
+        normalizedFilter
+      )
+
+      if (selector) {
+        return selector
+      }
     }
   }
 

@@ -79,9 +79,7 @@ describe('Data ID and Complex Structure Selector Tests', () => {
     const findNode = $('.target-element').get(1)
     const uniqueSelector = unique(findNode)
 
-    expect(uniqueSelector).to.equal(
-      '[data-state="closed"] > [data-sidebar="menu-button"] > .target-element'
-    )
+    expect(uniqueSelector).to.equal('a[href="/map"] > .target-element')
   })
 
   it('Should handle the complex sidebar example correctly', () => {

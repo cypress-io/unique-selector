@@ -115,7 +115,7 @@ describe('Unique Selector Tests', () => {
     )
     const findNode = $('.test5').find('span').get(0)
     const uniqueSelector = unique(findNode)
-    expect(uniqueSelector).to.equal(':nth-child(1) > span')
+    expect(uniqueSelector).to.equal('div:nth-child(1) > span')
   })
 
   it('Tag', () => {
@@ -541,7 +541,7 @@ describe('Unique Selector Tests', () => {
                   <path d="M4 4a16 16 0 0 1 16 16"></path>
                   <circle cx="5" cy="19" r="1"></circle>
                 </svg>
-                <span>Worldwide feed</span>
+                <span data-id="map">Worldwide feed</span>
               </a>
             </li>
           </ul>
@@ -616,13 +616,11 @@ describe('Unique Selector Tests', () => {
 
     const element = $("[data-id='map']").get(0)
     const selected = unique(element)
-    expect(selected).to.equal('[data-id="map"]')
+    expect(selected).to.equal('a[href="/map"] > [data-id="map"]')
 
     const feedElement = $('body').find('span:contains("Worldwide feed")').get(0)
     const feedSelector = unique(feedElement)
 
-    expect(feedSelector).to.not.include(':nth-child(')
-
-    expect(feedSelector.includes('data-sidebar')).to.be.true
+    expect(feedSelector).to.equal('a[href="/itineraries"] > [data-id="map"]')
   })
 })
