@@ -6,6 +6,7 @@ import { getName } from './getName'
 import { getNthChild } from './getNthChild'
 import { getTag } from './getTag'
 import { isUnique } from './isUnique'
+import { getScoreSelector } from './getScoreSelector'
 
 /**
  * Recursively finds a unique selector for a given element, searching up to 2 levels of parent.
@@ -84,6 +85,13 @@ export function getPotentialUniqueSelector(
     }
   }
 
+  // Sort selectors by score (highest first) to prioritize better selectors
+  uniqueSelectors.sort((a, b) => {
+    const scoreA = getScoreSelector(a)
+    const scoreB = getScoreSelector(b)
+    return scoreB - scoreA
+  })
+
   // Try each unique selector
   for (const token of uniqueSelectors) {
     const candidate = `${directSelector}${token}`
@@ -107,8 +115,15 @@ export function getPotentialUniqueSelector(
     )
 
     if (parentSelector && parentSelector !== '*') {
+      // Sort tokens by score for parent combinations too
+      const sortedTokens = [...uniqueSelectors].sort((a, b) => {
+        const scoreA = getScoreSelector(a)
+        const scoreB = getScoreSelector(b)
+        return scoreB - scoreA
+      })
+
       // Try child combinator with tokens
-      for (const token of uniqueSelectors) {
+      for (const token of sortedTokens) {
         const childSelector = `${parentSelector} > ${directSelector}${token}`
         if (normalizedFilter && !normalizedFilter(childSelector)) continue
 
@@ -124,7 +139,7 @@ export function getPotentialUniqueSelector(
       }
 
       // Try descendant combinator with tokens
-      for (const token of uniqueSelectors) {
+      for (const token of sortedTokens) {
         const descendantSelector = `${parentSelector} ${directSelector}${token}`
         if (normalizedFilter && !normalizedFilter(descendantSelector)) continue
 

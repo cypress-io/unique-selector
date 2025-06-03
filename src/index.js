@@ -13,6 +13,7 @@ import { getTag } from './getTag'
 import { isUnique } from './isUnique'
 import { getAttributeSelector } from './getAttribute'
 import { getPotentialUniqueSelector } from './getPotentialUniqueSelector'
+import { getScoreSelector } from './getScoreSelector'
 
 const dataRegex = /^data-.+/
 const attrRegex = /^attribute:(.+)/m
@@ -118,53 +119,6 @@ function getUniqueCombination(element, items, tag) {
 }
 
 /**
- * Scores a selector based on its quality and specificity
- * Higher scores are better
- * @param { String } selector
- * @return { Number }
- */
-function scoreSelector(selector) {
-  if (!selector) return 0
-
-  // Base score
-  let score = 1
-
-  // Prefer attribute-based selectors over positional ones
-  if (selector.includes(':nth-child')) {
-    score -= 5
-  }
-
-  // Prioritize by selector type
-  if (selector.startsWith('#')) {
-    // ID selectors are the most specific and stable
-    score += 100
-  } else if (selector.startsWith('[data-id')) {
-    // data-id is almost as good as ID
-    score += 90
-  } else if (selector.startsWith('[data-')) {
-    // Other data attributes are good
-    score += 80
-  } else if (selector.startsWith('[name')) {
-    // name attribute is good
-    score += 70
-  } else if (selector.startsWith('[')) {
-    // Other attribute selectors
-    score += 60
-  } else if (selector.startsWith('.')) {
-    // Class selectors
-    score += 50
-  } else if (/^[a-z]+$/.test(selector)) {
-    // Tag selectors
-    score += 30
-  }
-
-  // Penalize long selectors
-  score -= selector.length / 10
-
-  return score
-}
-
-/**
  * Returns a uniqueSelector based on the passed options
  * @param  { DOM } element
  * @param  { Array } options
@@ -241,7 +195,7 @@ function getUniqueSelector(element, selectorTypes, attributesToIgnore, filter) {
 
   // Sort candidates by score and return the highest-scoring unique selector
   if (candidates.length > 0) {
-    candidates.sort((a, b) => scoreSelector(b) - scoreSelector(a))
+    candidates.sort((a, b) => getScoreSelector(b) - getScoreSelector(a))
 
     return candidates[0]
   }
@@ -348,7 +302,7 @@ export default function unique(el, options = {}) {
       if (singleSelector && isUnique(el, singleSelector)) {
         candidateSelectors.push({
           selector: singleSelector,
-          score: scoreSelector(singleSelector),
+          score: getScoreSelector(singleSelector),
         })
       }
 
@@ -358,7 +312,7 @@ export default function unique(el, options = {}) {
         if (isUnique(el, withParent)) {
           candidateSelectors.push({
             selector: withParent,
-            score: scoreSelector(withParent),
+            score: getScoreSelector(withParent),
           })
         }
       }
@@ -380,7 +334,7 @@ export default function unique(el, options = {}) {
     if (isUniqueSelector) {
       candidateSelectors.push({
         selector: currentPath,
-        score: scoreSelector(currentPath),
+        score: getScoreSelector(currentPath),
       })
     }
 
