@@ -2,19 +2,21 @@
  * Expose `unique`
  */
 
-import { getID } from './getID';
-import { getClassSelectors } from './getClasses';
-import { getCombinations } from './getCombinations';
-import { getAttributes } from './getAttributes';
+import { getID } from './getID'
+import { getClassSelectors } from './getClasses'
+import { getCombinations } from './getCombinations'
+import { getAttributes } from './getAttributes'
+import { getDataAttributes } from './getDataAttributes'
 import { getName } from './getName'
-import { getNthChild } from './getNthChild';
-import { getTag } from './getTag';
-import { isUnique } from './isUnique';
-import { getParents } from './getParents';
-import { getAttributeSelector } from './getAttribute';
+import { getNthChild } from './getNthChild'
+import { getTag } from './getTag'
+import { isUnique } from './isUnique'
+import { getAttributeSelector } from './getAttribute'
+import { getScoreSelector } from './getScoreSelector'
+import { getPotentialUniqueSelectors } from './getPotentialUniqueSelectors'
 
-const dataRegex = /^data-.+/;
-const attrRegex = /^attribute:(.+)/m;
+const dataRegex = /^data-.+/
+const attrRegex = /^attribute:(.+)/m
 
 /**
  * @typedef Filter
@@ -30,13 +32,12 @@ const attrRegex = /^attribute:(.+)/m;
  * @param  { Object } element
  * @return { Object }
  */
-function getAllSelectors( el, selectors, attributesToIgnore, filter )
-{
+function getAllSelectors(el, selectors, attributesToIgnore, filter) {
   const consolidatedAttributesToIgnore = [...attributesToIgnore]
   const nonAttributeSelectors = []
   for (const selectorType of selectors) {
     if (dataRegex.test(selectorType)) {
-      consolidatedAttributesToIgnore.push(selectorType)
+      nonAttributeSelectors.push(selectorType)
     } else if (attrRegex.test(selectorType)) {
       consolidatedAttributesToIgnore.push(selectorType.replace(attrRegex, '$1'))
     } else {
@@ -44,22 +45,24 @@ function getAllSelectors( el, selectors, attributesToIgnore, filter )
     }
   }
 
-  const funcs =
-    {
-      'tag'        : elem => getTag( elem, filter ),
-      'nth-child'  : elem => getNthChild( elem, filter ),
-      'attributes' : elem => getAttributes( elem, consolidatedAttributesToIgnore, filter ),
-      'class'      : elem => getClassSelectors( elem, filter ),
-      'id'         : elem => getID( elem, filter ),
-      'name'       : elem => getName (elem, filter ),
-    };
+  const funcs = {
+    tag: (elem) => getTag(elem, filter),
+    'nth-child': (elem) => getNthChild(elem, filter),
+    attributes: (elem) =>
+      getAttributes(elem, consolidatedAttributesToIgnore, filter),
+    'data-attributes': (elem) => getDataAttributes(elem, filter),
+    class: (elem) => getClassSelectors(elem, filter),
+    id: (elem) => getID(elem, filter),
+    name: (elem) => getName(elem, filter),
+  }
 
-  return nonAttributeSelectors
-  .reduce( ( res, next ) =>
-  {
-    res[ next ] = funcs[ next ]( el );
-    return res;
-  }, {} );
+  return nonAttributeSelectors.reduce((res, next) => {
+    if (next.startsWith('data-')) {
+      next = 'data-attributes'
+    }
+    res[next] = funcs[next](el)
+    return res
+  }, {})
 }
 
 /**
@@ -68,12 +71,11 @@ function getAllSelectors( el, selectors, attributesToIgnore, filter )
  * @param { String } Selectors
  * @return { Boolean }
  */
-function testUniqueness( element, selector )
-{
-  const { parentNode } = element;
+function testUniqueness(element, selector) {
+  const { parentNode } = element
   try {
-    const elements = parentNode.querySelectorAll( selector );
-    return elements.length === 1 && elements[0] === element;
+    const elements = parentNode.querySelectorAll(selector)
+    return elements.length === 1 && elements[0] === element
   } catch (e) {
     return false
   }
@@ -85,9 +87,8 @@ function testUniqueness( element, selector )
  * @param  { Array } selectors
  * @return { String }
  */
-function getFirstUnique( element, selectors )
-{
-  return selectors.find( testUniqueness.bind( null, element ) );
+function getFirstUnique(element, selectors) {
+  return selectors.find(testUniqueness.bind(null, element))
 }
 
 /**
@@ -97,28 +98,24 @@ function getFirstUnique( element, selectors )
  * @param  { String } tag
  * @return { String }
  */
-function getUniqueCombination( element, items, tag )
-{
-  let combinations = getCombinations( items, 3 ),
-    firstUnique = getFirstUnique( element, combinations );
+function getUniqueCombination(element, items, tag) {
+  let combinations = getCombinations(items, 3),
+    firstUnique = getFirstUnique(element, combinations)
 
-  if( Boolean( firstUnique ) )
-  {
-    return firstUnique;
+  if (Boolean(firstUnique)) {
+    return firstUnique
   }
 
-  if( Boolean( tag ) )
-  {
-    combinations = combinations.map( combination => tag + combination );
-    firstUnique = getFirstUnique( element, combinations );
+  if (Boolean(tag)) {
+    combinations = combinations.map((combination) => tag + combination)
+    firstUnique = getFirstUnique(element, combinations)
 
-    if( Boolean( firstUnique ) )
-      {
-      return firstUnique;
+    if (Boolean(firstUnique)) {
+      return firstUnique
     }
   }
 
-  return null;
+  return null
 }
 
 /**
@@ -127,69 +124,87 @@ function getUniqueCombination( element, items, tag )
  * @param  { Array } options
  * @return { String }
  */
-function getUniqueSelector( element, selectorTypes, attributesToIgnore, filter )
-{
-  let foundSelector;
+function getUniqueSelector(element, selectorTypes, attributesToIgnore, filter) {
+  let foundSelector
+  let candidates = []
 
-  const elementSelectors = getAllSelectors( element, selectorTypes, attributesToIgnore, filter );
+  const elementSelectors = getAllSelectors(
+    element,
+    selectorTypes,
+    attributesToIgnore,
+    filter
+  )
 
-  for( let selectorType of selectorTypes )
-  {
-    let selector = elementSelectors[ selectorType ];
+  for (let selectorType of selectorTypes) {
+    let selector = elementSelectors[selectorType]
 
     // if we are a data attribute
     const isDataAttributeSelectorType = dataRegex.test(selectorType)
-    const isAttributeSelectorType = !isDataAttributeSelectorType && attrRegex.test(selectorType)
-    if ( isDataAttributeSelectorType || isAttributeSelectorType )
-    {
-      const attributeToQuery = isDataAttributeSelectorType ? selectorType : selectorType.replace(attrRegex, '$1')
-      const attributeSelector = getAttributeSelector(element, attributeToQuery, filter)
+    const isAttributeSelectorType =
+      !isDataAttributeSelectorType && attrRegex.test(selectorType)
+    if (isDataAttributeSelectorType || isAttributeSelectorType) {
+      const attributeToQuery = isDataAttributeSelectorType
+        ? selectorType
+        : selectorType.replace(attrRegex, '$1')
+      const attributeSelector = getAttributeSelector(
+        element,
+        attributeToQuery,
+        filter
+      )
       // if we found a selector via attribute
-      if ( attributeSelector )
-      {
+      if (attributeSelector) {
         selector = attributeSelector
-        selectorType = 'attribute';
+        selectorType = 'attribute'
       }
     }
 
-    if ( !Boolean( selector ) ) continue;
+    if (!Boolean(selector)) continue
 
-    switch ( selectorType )
-    {
-      case 'attribute' :
-      case 'id' :
+    switch (selectorType) {
+      case 'attribute':
+      case 'id':
       case 'name':
       case 'tag':
-        if ( testUniqueness( element, selector ) )
-        {
-          return selector;
+        if (testUniqueness(element, selector)) {
+          candidates.push(selector)
         }
-        break;
+        break
       case 'class':
       case 'attributes':
-        if ( selector.length )
-        {
-          foundSelector = getUniqueCombination( element, selector, elementSelectors.tag );
-          if ( foundSelector )
-          {
-            return foundSelector;
+      case 'data-attributes':
+        if (selector.length) {
+          foundSelector = getUniqueCombination(
+            element,
+            selector,
+            elementSelectors.tag
+          )
+          if (foundSelector) {
+            candidates.push(foundSelector)
           }
         }
-        break;
+        break
 
       case 'nth-child':
-        return selector;
+        candidates.push(selector)
+        break
 
       default:
-        break;
+        break
     }
   }
-  return '*';
+
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => getScoreSelector(b) - getScoreSelector(a))
+
+    return candidates[0]
+  }
+
+  return '*'
 }
 
 /**
- * Generate unique CSS selector for given DOM element. Selector uniqueness is determined based on the given element's root node. 
- * Elements rendered within Shadow DOM will derive a selector that is unique within the associated ShadowRoot context. 
+ * Generate unique CSS selector for given DOM element. Selector uniqueness is determined based on the given element's root node.
+ * Elements rendered within Shadow DOM will derive a selector that is unique within the associated ShadowRoot context.
  * Otherwise, a selector that is unique within the element's owning document will be derived.
  *
  * @param {Element} el
@@ -202,25 +217,37 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore, filter )
  * @return {String}
  * @api private
  */
-export default function unique( el, options={} ) {
-  const { 
-    selectorTypes=['id', 'name', 'class', 'tag', 'nth-child'], 
-    attributesToIgnore= ['id', 'class', 'length'],
+export default function unique(el, options = {}) {
+  const {
+    selectorTypes = [
+      'data-attributes',
+      'id',
+      'name',
+      'class',
+      'tag',
+      'nth-child',
+    ],
+    attributesToIgnore = ['id', 'class', 'length'],
     filter,
     selectorCache,
-    isUniqueCache
-  } = options;
+    isUniqueCache,
+  } = options
+
   // If filter was provided wrap it to ensure a default value of `true` is returned if the provided function fails to return a value
-  const normalizedFilter = filter && function(type, key, value) {
-    const result = filter(type, key, value)
-    if (result === null || result === undefined) {
-      return true
+  const normalizedFilter =
+    filter &&
+    function (type, key, value) {
+      const result = filter(type, key, value)
+      if (result === null || result === undefined) {
+        return true
+      }
+      return result
     }
-    return result
-  }
-  const allSelectors = [];
+
+  const allSelectors = []
 
   let currentElement = el
+
   while (currentElement) {
     let selector = selectorCache ? selectorCache.get(currentElement) : undefined
 
@@ -231,14 +258,18 @@ export default function unique( el, options={} ) {
         attributesToIgnore,
         normalizedFilter
       )
+
       if (selectorCache) {
         selectorCache.set(currentElement, selector)
-       }
-     }
+      }
+    }
 
     allSelectors.unshift(selector)
     const maybeUniqueSelector = allSelectors.join(' > ')
-    let isUniqueSelector = isUniqueCache ? isUniqueCache.get(maybeUniqueSelector) : undefined
+    let isUniqueSelector = isUniqueCache
+      ? isUniqueCache.get(maybeUniqueSelector)
+      : undefined
+
     if (isUniqueSelector === undefined) {
       isUniqueSelector = isUnique(el, maybeUniqueSelector)
       if (isUniqueCache) {
@@ -254,7 +285,64 @@ export default function unique( el, options={} ) {
     // filter out any document/document fragment nodes that may
     // be ancestors to elements within Shadow DOM trees.
     currentElement = currentElement.parentElement
-   }
+  }
 
-  return null;
+  return null
+}
+
+export function uniqueSelectors(el, options = {}) {
+  const {
+    selectorTypes = [
+      'data-attributes',
+      'id',
+      'name',
+      'class',
+      'tag',
+      'nth-child',
+    ],
+    attributesToIgnore = ['id', 'class', 'length'],
+    filter,
+    selectorCache,
+    isUniqueCache,
+    maxCandidates = 10,
+  } = options
+
+  // If filter was provided wrap it to ensure a default value of `true` is returned if the provided function fails to return a value
+  const normalizedFilter =
+    filter &&
+    function (type, key, value) {
+      const result = filter(type, key, value)
+      if (result === null || result === undefined) {
+        return true
+      }
+      return result
+    }
+
+  let directSelector = selectorCache ? selectorCache.get(el) : undefined
+
+  if (!directSelector) {
+    directSelector = getUniqueSelector(
+      el,
+      selectorTypes,
+      attributesToIgnore,
+      normalizedFilter
+    )
+
+    if (selectorCache) {
+      selectorCache.set(currentElement, directSelector)
+    }
+  }
+
+  const selectors = getPotentialUniqueSelectors(
+    el,
+    directSelector,
+    selectorTypes,
+    attributesToIgnore,
+    normalizedFilter,
+    maxCandidates
+  )
+
+  const uniqueSelector = unique(el, options)
+
+  return [...new Set([...selectors, uniqueSelector])]
 }

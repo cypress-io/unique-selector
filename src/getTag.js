@@ -1,5 +1,7 @@
+const tagCache = new WeakMap()
+
 function isString(value) {
-  return typeof value === 'string';
+  return typeof value === 'string'
 }
 
 /**
@@ -8,11 +10,24 @@ function isString(value) {
  * @param { Function } filter
  * @return { String }
  */
-export function getTag( el, filter )
-{
-  let tagName = el.tagName;
+export function getTag(el, filter) {
+  if (filter) {
+    return getTagUncached(el, filter)
+  }
 
-  // If the tagName attribute has been overridden, we should 
+  if (tagCache.has(el)) {
+    return tagCache.get(el)
+  }
+
+  const result = getTagUncached(el, null)
+  tagCache.set(el, result)
+  return result
+}
+
+function getTagUncached(el, filter) {
+  let tagName = el.tagName
+
+  // If the tagName attribute has been overridden, we should
   // check the nodeName property instead. If the nodeName property
   // is also not a string, we should return null and ignore tagName
   // for selector generation.
@@ -22,18 +37,18 @@ export function getTag( el, filter )
   // tagName property is a reference to the input element, not
   // a string.
   if (!isString(tagName)) {
-    tagName = el.nodeName;
+    tagName = el.nodeName
 
     if (!isString(tagName)) {
-      return null;
+      return null
     }
   }
 
   tagName = tagName.toLowerCase().replace(/:/g, '\\:')
 
   if (filter && !filter('tag', 'tag', tagName)) {
-    return null;
+    return null
   }
 
-  return tagName;
+  return tagName
 }
