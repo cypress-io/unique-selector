@@ -1,6 +1,6 @@
 const expect = require('chai').expect
 const JSDOM = require('jsdom').JSDOM
-const unique = require('../lib').default
+const uniqueSelectors = require('../lib').uniqueSelectors
 
 const $ = require('jquery')(new JSDOM().window)
 
@@ -12,8 +12,8 @@ describe('Data ID and Complex Structure Selector Tests', () => {
   it('Should prioritize data-id attribute over other selectors', () => {
     $('body').append('<div data-id="map" class="test3 other-class"></div>')
     const findNode = $('body').find('.test3').get(0)
-    const uniqueSelector = unique(findNode)
-    expect(uniqueSelector).to.equal('[data-id="map"]')
+    const uniqueSelector = uniqueSelectors(findNode)
+    expect(uniqueSelector).to.deep.equal(['[data-id="map"]'])
   })
 
   it('Should simplify complex nested structure selectors with duplicate data-id', () => {
@@ -31,10 +31,19 @@ describe('Data ID and Complex Structure Selector Tests', () => {
     `)
 
     const findNode = $('[data-id="map"]').get(0)
-    const uniqueSelector = unique(findNode)
-    expect(uniqueSelector).to.equal(
-      '[data-sidebar="menu-button"] > :nth-child(1)'
-    )
+    const uniqueSelector = uniqueSelectors(findNode)
+    expect(uniqueSelector).to.deep.equal([
+      ':nth-child(1)[data-id="map"]',
+      ':nth-child(1)span',
+      'div[data-sidebar="menu-button"] > :nth-child(1)[data-id="map"]',
+      'div[data-sidebar="menu-button"] > :nth-child(1)span',
+      'div[data-sidebar="menu-button"] > :nth-child(1)',
+      'div[data-sidebar="menu-button"] :nth-child(1)[data-id="map"]',
+      'div[data-sidebar="menu-button"] :nth-child(1)span',
+      'div.level2 > div[data-sidebar="menu-button"] > :nth-child(1)[data-id="map"]',
+      'div.level2 > div[data-sidebar="menu-button"] > :nth-child(1)span',
+      '[data-sidebar="menu-button"] > :nth-child(1)',
+    ])
   })
 
   it('Should simplify complex nested structure selectors', () => {
@@ -51,8 +60,8 @@ describe('Data ID and Complex Structure Selector Tests', () => {
     `)
 
     const findNode = $('[data-id="map"]').get(0)
-    const uniqueSelector = unique(findNode)
-    expect(uniqueSelector).to.equal('[data-id="map"]')
+    const uniqueSelector = uniqueSelectors(findNode)
+    expect(uniqueSelector).to.deep.equal(['[data-id="map"]'])
   })
 
   it('Should handle complex structure without data-id by using simplified selector', () => {
@@ -77,9 +86,17 @@ describe('Data ID and Complex Structure Selector Tests', () => {
     `)
 
     const findNode = $('.target-element').get(1)
-    const uniqueSelector = unique(findNode)
-
-    expect(uniqueSelector).to.equal('a[href="/map"] > .target-element')
+    const uniqueSelector = uniqueSelectors(findNode)
+    expect(uniqueSelector).to.deep.equal([
+      'a[href="/map"] > .target-element',
+      'li[data-state="closed"] > a[href="/map"] > .target-element',
+      'li[data-state="closed"] > a > .target-element',
+      'li[data-state="closed"] a[href="/map"] > .target-element',
+      'li:nth-child(2) > a[href="/map"] > .target-element',
+      'li:nth-child(2) > a > .target-element',
+      'li:nth-child(2) a[href="/map"] > .target-element',
+      '[data-state="closed"] > [data-sidebar="menu-button"] > .target-element',
+    ])
   })
 
   it('Should handle the complex sidebar example correctly', () => {
@@ -105,9 +122,8 @@ describe('Data ID and Complex Structure Selector Tests', () => {
     `)
 
     const findNode = $('[data-id="map"]').get(0)
-    const uniqueSelector = unique(findNode)
-
+    const uniqueSelector = uniqueSelectors(findNode)
     // Should use the data-id selector directly
-    expect(uniqueSelector).to.equal('[data-id="map"]')
+    expect(uniqueSelector).to.deep.equal(['[data-id="map"]'])
   })
 })

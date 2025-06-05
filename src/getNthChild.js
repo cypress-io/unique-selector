@@ -1,5 +1,7 @@
 import { isElement } from './isElement'
 
+const nthChildCache = new WeakMap()
+
 /**
  * Returns the selectors based on the position of the element relative to its siblings
  * @param  { Object } element
@@ -7,6 +9,20 @@ import { isElement } from './isElement'
  * @return { Array }
  */
 export function getNthChild(element, filter) {
+  if (filter) {
+    return getNthChildUncached(element, filter)
+  }
+
+  if (nthChildCache.has(element)) {
+    return nthChildCache.get(element)
+  }
+
+  const result = getNthChildUncached(element, null)
+  nthChildCache.set(element, result)
+  return result
+}
+
+function getNthChildUncached(element, filter) {
   let counter = 0
   let k
   let sibling

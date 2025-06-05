@@ -12,8 +12,8 @@ import { getNthChild } from './getNthChild'
 import { getTag } from './getTag'
 import { isUnique } from './isUnique'
 import { getAttributeSelector } from './getAttribute'
-import { getPotentialUniqueSelector } from './getPotentialUniqueSelector'
 import { getScoreSelector } from './getScoreSelector'
+import { getPotentialUniqueSelectors } from './getPotentialUniqueSelectors'
 
 const dataRegex = /^data-.+/
 const attrRegex = /^attribute:(.+)/m
@@ -193,7 +193,6 @@ function getUniqueSelector(element, selectorTypes, attributesToIgnore, filter) {
     }
   }
 
-  // Sort candidates by score and return the highest-scoring unique selector
   if (candidates.length > 0) {
     candidates.sort((a, b) => getScoreSelector(b) - getScoreSelector(a))
 
@@ -245,36 +244,8 @@ export default function unique(el, options = {}) {
       return result
     }
 
-  // Strategy 1: Try to find a direct unique selector for the element itself
-  const directSelector = getUniqueSelector(
-    el,
-    selectorTypes,
-    attributesToIgnore,
-    normalizedFilter
-  )
-
-  // If the direct selector is already good (not nth-child), use it
-  if (directSelector !== '*' && !directSelector.startsWith(':nth-child')) {
-    if (isUnique(el, directSelector)) {
-      return directSelector
-    } else {
-      const selector = getPotentialUniqueSelector(
-        el,
-        directSelector,
-        selectorTypes,
-        attributesToIgnore,
-        normalizedFilter
-      )
-
-      if (selector) {
-        return selector
-      }
-    }
-  }
-
-  // Strategy 2: Build a path of selectors if needed
   const allSelectors = []
-  const candidateSelectors = []
+
   let currentElement = el
 
   while (currentElement) {
@@ -294,68 +265,84 @@ export default function unique(el, options = {}) {
     }
 
     allSelectors.unshift(selector)
-
-    // Try different combinations of selectors at each step to find optimal ones
-    for (let i = 0; i < allSelectors.length; i++) {
-      // Try single selector
-      const singleSelector = allSelectors[i]
-      if (singleSelector && isUnique(el, singleSelector)) {
-        candidateSelectors.push({
-          selector: singleSelector,
-          score: getScoreSelector(singleSelector),
-        })
-      }
-
-      // Try with one parent
-      if (i < allSelectors.length - 1) {
-        const withParent = `${allSelectors[i + 1]} > ${singleSelector}`
-        if (isUnique(el, withParent)) {
-          candidateSelectors.push({
-            selector: withParent,
-            score: getScoreSelector(withParent),
-          })
-        }
-      }
-    }
-
-    // Try the full path as it stands
-    const currentPath = allSelectors.join(' > ')
+    const maybeUniqueSelector = allSelectors.join(' > ')
     let isUniqueSelector = isUniqueCache
-      ? isUniqueCache.get(currentPath)
+      ? isUniqueCache.get(maybeUniqueSelector)
       : undefined
 
     if (isUniqueSelector === undefined) {
-      isUniqueSelector = isUnique(el, currentPath)
+      isUniqueSelector = isUnique(el, maybeUniqueSelector)
       if (isUniqueCache) {
-        isUniqueCache.set(currentPath, isUniqueSelector)
+        isUniqueCache.set(maybeUniqueSelector, isUniqueSelector)
       }
     }
 
     if (isUniqueSelector) {
-      candidateSelectors.push({
-        selector: currentPath,
-        score: getScoreSelector(currentPath),
-      })
+      return maybeUniqueSelector
     }
 
-    // If we have good candidates, pick the best one
-    if (candidateSelectors.length > 0) {
-      // Sort by score (highest first)
-      candidateSelectors.sort((a, b) => b.score - a.score)
-      return candidateSelectors[0].selector
+    // Using parentElement here (rather than parentNode) to
+    // filter out any document/document fragment nodes that may
+    // be ancestors to elements within Shadow DOM trees.
+    currentElement = currentElement.parentElement
+  }
+
+  return null
+}
+
+export function uniqueSelectors(el, options = {}) {
+  const {
+    selectorTypes = [
+      'data-attributes',
+      'id',
+      'name',
+      'class',
+      'tag',
+      'nth-child',
+    ],
+    attributesToIgnore = ['id', 'class', 'length'],
+    filter,
+    selectorCache,
+    isUniqueCache,
+    maxCandidates = 10,
+  } = options
+
+  // If filter was provided wrap it to ensure a default value of `true` is returned if the provided function fails to return a value
+  const normalizedFilter =
+    filter &&
+    function (type, key, value) {
+      const result = filter(type, key, value)
+      if (result === null || result === undefined) {
+        return true
+      }
+      return result
     }
 
-    // Move up the DOM tree
-    if (currentElement.parentElement) {
-      currentElement = currentElement.parentElement
-    } else {
-      // Only consider shadow root parent if it actually exists
-      const rootNode = currentElement.getRootNode()
-      currentElement =
-        rootNode && rootNode.nodeType === 11 ? rootNode.host : null
+  let directSelector = selectorCache ? selectorCache.get(el) : undefined
+
+  if (!directSelector) {
+    directSelector = getUniqueSelector(
+      el,
+      selectorTypes,
+      attributesToIgnore,
+      normalizedFilter
+    )
+
+    if (selectorCache) {
+      selectorCache.set(currentElement, directSelector)
     }
   }
 
-  // If we still don't have a good selector, return the full path
-  return allSelectors.join(' > ')
+  const selectors = getPotentialUniqueSelectors(
+    el,
+    directSelector,
+    selectorTypes,
+    attributesToIgnore,
+    normalizedFilter,
+    maxCandidates
+  )
+
+  const uniqueSelector = unique(el, options)
+
+  return [...new Set([...selectors, uniqueSelector])]
 }

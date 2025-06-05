@@ -1,3 +1,5 @@
+const tagCache = new WeakMap()
+
 function isString(value) {
   return typeof value === 'string'
 }
@@ -9,6 +11,20 @@ function isString(value) {
  * @return { String }
  */
 export function getTag(el, filter) {
+  if (filter) {
+    return getTagUncached(el, filter)
+  }
+
+  if (tagCache.has(el)) {
+    return tagCache.get(el)
+  }
+
+  const result = getTagUncached(el, null)
+  tagCache.set(el, result)
+  return result
+}
+
+function getTagUncached(el, filter) {
   let tagName = el.tagName
 
   // If the tagName attribute has been overridden, we should

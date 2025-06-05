@@ -1,5 +1,8 @@
 import 'css.escape'
 
+const classesCache = new WeakMap()
+const classSelectorCache = new WeakMap()
+
 /**
  * Get class names for an element
  *
@@ -8,6 +11,20 @@ import 'css.escape'
  * @return { Array }
  */
 export function getClasses(el, filter) {
+  if (filter) {
+    return getClassesUncached(el, filter)
+  }
+
+  if (classesCache.has(el)) {
+    return classesCache.get(el)
+  }
+
+  const result = getClassesUncached(el, null)
+  classesCache.set(el, result)
+  return result
+}
+
+function getClassesUncached(el, filter) {
   if (!el.hasAttribute('class')) {
     return []
   }
@@ -36,6 +53,18 @@ export function getClasses(el, filter) {
  * @return { Array }
  */
 export function getClassSelectors(el, filter) {
-  const classList = getClasses(el, filter).filter(Boolean)
-  return classList.map((cl) => `.${CSS.escape(cl)}`)
+  if (filter) {
+    const classList = getClasses(el, filter).filter(Boolean)
+    return classList.map((cl) => `.${CSS.escape(cl)}`)
+  }
+
+  if (classSelectorCache.has(el)) {
+    return classSelectorCache.get(el)
+  }
+
+  const classList = getClasses(el, null).filter(Boolean)
+  const result = classList.map((cl) => `.${CSS.escape(cl)}`)
+
+  classSelectorCache.set(el, result)
+  return result
 }

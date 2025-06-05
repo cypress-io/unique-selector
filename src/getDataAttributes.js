@@ -1,3 +1,5 @@
+const dataAttributesCache = new WeakMap()
+
 /**
  * Returns the data-* attribute selectors of the element
  * @param  { Element } element
@@ -5,6 +7,20 @@
  * @return { Array }
  */
 export function getDataAttributes(el, filter) {
+  if (filter) {
+    return getDataAttributesUncached(el, filter)
+  }
+
+  if (dataAttributesCache.has(el)) {
+    return dataAttributesCache.get(el)
+  }
+
+  const result = getDataAttributesUncached(el, null)
+  dataAttributesCache.set(el, result)
+  return result
+}
+
+function getDataAttributesUncached(el, filter) {
   const { attributes } = el
   const attrs = [...attributes]
 

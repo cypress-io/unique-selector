@@ -1,6 +1,6 @@
 const expect = require('chai').expect
 const JSDOM = require('jsdom').JSDOM
-const unique = require('../lib').default
+const uniqueSelectors = require('../lib').uniqueSelectors
 
 const $ = require('jquery')(new JSDOM().window)
 
@@ -25,9 +25,8 @@ describe('Heuristic Selector Tests', () => {
     `)
 
     const element = $('[data-id="page-title"]').get(0)
-    const selector = unique(element)
-
-    expect(selector).to.equal('[data-id="page-title"]')
+    const selector = uniqueSelectors(element)
+    expect(selector).to.deep.equal(['[data-id="page-title"]'])
   })
 
   it('Should prefer data attributes over nth-child in complex structures', () => {
@@ -48,9 +47,9 @@ describe('Heuristic Selector Tests', () => {
     `)
 
     const element = $('.intro').get(0)
-    const selector = unique(element)
+    const selector = uniqueSelectors(element)
 
-    expect(selector).to.equal('[data-test="intro"]')
+    expect(selector).to.deep.equal(['[data-test="intro"]'])
   })
 
   it('Should prefer short selectors over long ones', () => {
@@ -67,9 +66,9 @@ describe('Heuristic Selector Tests', () => {
     `)
 
     const element = $('.unique-class').get(0)
-    const selector = unique(element)
+    const selector = uniqueSelectors(element)
 
-    expect(selector).to.equal('.unique-class')
+    expect(selector).to.deep.equal(['.unique-class'])
   })
 
   it('Should handle elements with multiple data attributes', () => {
@@ -80,9 +79,9 @@ describe('Heuristic Selector Tests', () => {
     `)
 
     const element = $('span[data-testid="label"]').get(0)
-    const selector = unique(element)
+    const selector = uniqueSelectors(element)
 
-    expect(selector).to.equal('[data-testid="label"]')
+    expect(selector).to.deep.equal(['[data-testid="label"]'])
   })
 
   it('Should handle really complex nested structures effectively', () => {
@@ -110,9 +109,9 @@ describe('Heuristic Selector Tests', () => {
     `)
 
     const element = $('.target-deep').get(0)
-    const selector = unique(element)
+    const selector = uniqueSelectors(element)
 
-    expect(selector).to.equal('.target-deep')
+    expect(selector).to.deep.equal(['.target-deep'])
   })
 
   it('Should produce consistent results for adjacent similar elements', () => {
@@ -127,20 +126,20 @@ describe('Heuristic Selector Tests', () => {
     `)
 
     const elements = $('span').get()
-    const selectors = elements.map((el) => unique(el))
+    const selectors = elements.map((el) => uniqueSelectors(el))
 
     // All selectors should follow the same pattern
     const pattern = selectors[0].includes('data-item') ? 'data-item' : null
 
     if (pattern) {
       selectors.forEach((selector) => {
-        expect(selector.includes(pattern)).to.be.true
+        expect(selector.includes(pattern)).to.be.true // eslint-disable-line no-unused-expressions
       })
     }
 
     // None should use nth-child for these structured elements
     selectors.forEach((selector) => {
-      expect(selector.includes(':nth-child')).to.be.false
+      expect(selector.includes(':nth-child')).to.be.false // eslint-disable-line no-unused-expressions
     })
   })
 })
