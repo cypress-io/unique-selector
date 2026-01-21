@@ -238,17 +238,19 @@ export default function unique( el, options={} ) {
      }
 
     allSelectors.unshift(selector)
-
     let maybeUniqueSelector = allSelectors.join(' > ')
     let isUniqueSelector = isUniqueCache ? isUniqueCache.get(maybeUniqueSelector) : undefined
     if (isUniqueSelector === undefined) {
       isUniqueSelector = isUnique(el, maybeUniqueSelector)
-      
       if (isUniqueCache) {
         isUniqueCache.set(maybeUniqueSelector, isUniqueSelector)
       }
 
-      if (!isUniqueSelector && isShadowRoot(el.getRootNode())) {
+      // If the selector is not unique but we detect we've reached a ShadowRoot attempt
+      // to prefix the selector with `:host >` to anchor against the root. This helps
+      // address the possibility of a unique path segment not existing before reaching
+      // the root.
+      if (!isUniqueSelector && isShadowRoot(el.parentNode)) {
         maybeUniqueSelector = `:host > ${maybeUniqueSelector}`
         isUniqueSelector = isUnique(el, maybeUniqueSelector)
 
