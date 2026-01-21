@@ -12,6 +12,7 @@ import { getTag } from './getTag';
 import { isUnique } from './isUnique';
 import { getParents } from './getParents';
 import { getAttributeSelector } from './getAttribute';
+import { isShadowRoot } from './isShadowRoot';
 
 const dataRegex = /^data-.+/;
 const attrRegex = /^attribute:(.+)/m;
@@ -237,12 +238,23 @@ export default function unique( el, options={} ) {
      }
 
     allSelectors.unshift(selector)
-    const maybeUniqueSelector = allSelectors.join(' > ')
+
+    let maybeUniqueSelector = allSelectors.join(' > ')
     let isUniqueSelector = isUniqueCache ? isUniqueCache.get(maybeUniqueSelector) : undefined
     if (isUniqueSelector === undefined) {
       isUniqueSelector = isUnique(el, maybeUniqueSelector)
+      
       if (isUniqueCache) {
         isUniqueCache.set(maybeUniqueSelector, isUniqueSelector)
+      }
+
+      if (!isUniqueSelector && isShadowRoot(el.getRootNode())) {
+        maybeUniqueSelector = `:host > ${maybeUniqueSelector}`
+        isUniqueSelector = isUnique(el, maybeUniqueSelector)
+
+        if (isUniqueCache) {
+          isUniqueCache.set(maybeUniqueSelector, isUniqueSelector)
+        }
       }
     }
 

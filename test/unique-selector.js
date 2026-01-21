@@ -411,5 +411,84 @@ describe( 'Unique Selector Tests', () =>
       const uniqueSelectorForShadowContent = unique ( shadowElement.querySelectorAll('.shadow-button-class')[0] )
       expect( uniqueSelectorForShadowContent ).to.equal( '#inner-shadow-container > :nth-child(1)' );
     })
+
+    it( 'builds expected selector inside shadow root when first-level child selector matches nested children', () => {
+      /*
+      Shadow roots are capable of containing non-unique elements at the root level which, when building selectors,
+      will fall back to nth-child. If there also happens to be nested content that nth-child would evaluate to non-unique.
+      When creating a selector for a top-level element under a ShadowRoot which happens to fall back to nth-child we
+      should prefix with the `:host` pseudo-class to prevent this.
+
+      <div id="shadow-host">
+        # shadow-root (open)
+          <button />  <!-- :nth-child(1) -->
+          <div> <!-- :nth-child(2) -->
+            <button />  <!-- !!!!! Also matches :nth-child(1) due to being first child of `div`, thus exploding selector generation -->
+          </div>
+          <input />  <!-- :nth-child(3) -->
+      </div>
+      */
+      
+      $( 'body' ).append( '<div id="shadow-host" class="shadow-host-class"></div>' );
+
+      const hostNode = $( '#shadow-host' ).get( 0 );
+  
+      const shadowRoot = hostNode.attachShadow({ mode: "open" })
+      const topLevelButton = hostNode.ownerDocument.createElement('button')
+      const nestedContainer = hostNode.ownerDocument.createElement('div')
+      const topLevelInput = hostNode.ownerDocument.createElement('input')
+      nestedContainer.innerHTML = '<button /><p/>'
+      shadowRoot.appendChild(topLevelButton)
+      shadowRoot.appendChild(nestedContainer)
+      shadowRoot.appendChild(topLevelInput)
+    
+      const uniqueSelectorForHost = unique( hostNode );
+      expect( uniqueSelectorForHost ).to.equal( '#shadow-host' );
+    
+      const buttons = shadowRoot.querySelectorAll('button');
+      expect(buttons.length).to.equal(2);
+
+      // Non-unique tag at shadow root level
+      // - should build a :host-based selector due to conflict with nested element, no tag use
+      let value = unique( buttons[0], { selectorTypes : ['tag', 'nth-child'] } );
+      expect( value ).to.equal( ':host > :nth-child(1)' );
+      expect( shadowRoot.querySelectorAll(value).length).to.equal(1)
+      expect( shadowRoot.querySelectorAll(value)[0]).to.equal( buttons[0] );
+      // - should build a :host-based nth-child selector due to conflict with nested element
+      value = unique( buttons[0], { selectorTypes : ['nth-child'] } );
+      expect( value ).to.equal( ':host > :nth-child(1)' );
+      expect( shadowRoot.querySelectorAll(value).length).to.equal(1)
+      expect( shadowRoot.querySelectorAll(value)[0]).to.equal( buttons[0] );
+      
+      // Nested non-unique tag
+      // - should construct a normal selector with tag due to no conflict with nested element
+      value = unique( buttons[1], { selectorTypes : ['tag', 'nth-child'] } );
+      expect( value ).to.equal( 'div > button' );
+      expect( shadowRoot.querySelectorAll(value).length).to.equal(1)
+      expect( shadowRoot.querySelectorAll(value)[0]).to.equal( buttons[1] );
+      // - should build a :host-based nth-child selector due to conflict with nested element
+      value = unique( buttons[1], { selectorTypes : ['nth-child'] } );
+      expect( value ).to.equal( ':nth-child(2) > :nth-child(1)' );
+      expect( shadowRoot.querySelectorAll(value).length).to.equal(1)
+      expect( shadowRoot.querySelectorAll(value)[0]).to.equal( buttons[1] );
+
+
+      // TODO REMOVE
+      console.log(shadowRoot.querySelectorAll(':host > :nth-child(1)')[0])
+
+      const inputs = shadowRoot.querySelectorAll('input');
+      expect(inputs.length).to.equal(1);
+      // Unique input at shadow root level
+      // - should not build a :host-based selector since it's unique, should use tag
+      value = unique( inputs[0], { selectorTypes : ['tag', 'nth-child'] } );
+      expect( value ).to.equal( 'input' );
+      expect( shadowRoot.querySelectorAll(value).length).to.equal(1)
+      expect( shadowRoot.querySelectorAll(value)[0]).to.equal( inputs[0] );
+      // - should not build a :host-based selector since it's unique, should use nth-child
+      value = unique( inputs[0], { selectorTypes : ['nth-child'] } );
+      expect( value ).to.equal( ':nth-child(3)' );
+      expect( shadowRoot.querySelectorAll(value).length).to.equal(1)
+      expect( shadowRoot.querySelectorAll(value)[0]).to.equal( inputs[0] );
+    })
   })
 } );
