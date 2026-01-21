@@ -466,15 +466,11 @@ describe( 'Unique Selector Tests', () =>
       expect( value ).to.equal( 'div > button' );
       expect( shadowRoot.querySelectorAll(value).length).to.equal(1)
       expect( shadowRoot.querySelectorAll(value)[0]).to.equal( buttons[1] );
-      // - should build a :host-based nth-child selector due to conflict with nested element
+      // - should build not need a :host-based selector since a unique path exists
       value = unique( buttons[1], { selectorTypes : ['nth-child'] } );
       expect( value ).to.equal( ':nth-child(2) > :nth-child(1)' );
       expect( shadowRoot.querySelectorAll(value).length).to.equal(1)
       expect( shadowRoot.querySelectorAll(value)[0]).to.equal( buttons[1] );
-
-
-      // TODO REMOVE
-      console.log(shadowRoot.querySelectorAll(':host > :nth-child(1)')[0])
 
       const inputs = shadowRoot.querySelectorAll('input');
       expect(inputs.length).to.equal(1);
