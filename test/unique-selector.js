@@ -487,4 +487,10 @@ describe( 'Unique Selector Tests', () =>
       expect( shadowRoot.querySelectorAll(value)[0]).to.equal( inputs[0] );
     })
   })
+
+  it('should return null for element with no parent', () => {
+    const el = $( 'body' )[0].ownerDocument.createElement('div');
+    const uniqueSelector = unique( el );
+    expect( uniqueSelector ).to.equal( null );
+  })
 } );
