@@ -250,7 +250,7 @@ export default function unique( el, options={} ) {
       // to prefix the selector with `:host >` to anchor against the root. This helps
       // address the possibility of a unique path segment not existing before reaching
       // the root.
-      if (!isUniqueSelector && isShadowRoot(el.parentNode)) {
+      if (!isUniqueSelector && el.parentNode && isShadowRoot(el.parentNode)) {
         maybeUniqueSelector = `:host > ${maybeUniqueSelector}`
         isUniqueSelector = isUnique(el, maybeUniqueSelector)
 
