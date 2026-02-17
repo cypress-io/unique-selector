@@ -189,6 +189,68 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore, filter )
 }
 
 /**
+ * Check if ancestor is an ancestor of element
+ * @param {Element} ancestor
+ * @param {Element} element
+ * @return {Boolean}
+ */
+function isAncestor(ancestor, element) {
+  return ancestor && ancestor.contains && ancestor.contains(element);
+}
+
+/**
+ * Get significant attributes for an element based on configuration
+ * @param {Element} element
+ * @param {Object} significantAncestors
+ * @param {Map<Element, Object>} cache
+ * @return {Object} Object with selectors (array of attribute selectors) and attributeNames (array of matched attribute names)
+ */
+function getSignificantAttributes(element, significantAncestors, cache) {
+  if (!significantAncestors || !significantAncestors.attributes) {
+    return { selectors: [], attributeNames: [] };
+  }
+
+  // Check cache first
+  if (cache && cache.has(element)) {
+    return cache.get(element);
+  }
+
+  const matchingSelectors = [];
+  const matchingAttributeNames = [];
+
+  for (const { attribute, value = '*' } of significantAncestors.attributes) {
+    const attributeValue = element.getAttribute(attribute);
+    
+    if (attributeValue !== null) {
+      // Convert wildcard '*' to regex '.*'
+      const pattern = value === '*' ? '.*' : value;
+      
+      try {
+        const regex = new RegExp(pattern);
+        if (regex.test(attributeValue)) {
+          // Build the attribute selector
+          // Always include the value in quotes, even if it's an empty string
+          matchingSelectors.push(`[${attribute}="${attributeValue}"]`);
+          matchingAttributeNames.push(attribute);
+        }
+      } catch (e) {
+        // Invalid regex pattern, skip this attribute
+        continue;
+      }
+    }
+  }
+
+  const result = { selectors: matchingSelectors, attributeNames: matchingAttributeNames };
+
+  // Store in cache if provided
+  if (cache) {
+    cache.set(element, result);
+  }
+
+  return result;
+}
+
+/**
  * Generate unique CSS selector for given DOM element. Selector uniqueness is determined based on the given element's root node. 
  * Elements rendered within Shadow DOM will derive a selector that is unique within the associated ShadowRoot context. 
  * Otherwise, a selector that is unique within the element's owning document will be derived.
@@ -200,6 +262,10 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore, filter )
  * @param {Filter} options.filter Provide a filter function to conditionally reject various traits when building selectors.
  * @param {Map<Element, String>} options.selectorCache Provide a cache to improve performance of repeated selector generation - it is the responsibility of the caller to handle cache invalidation. Caching is performed using the input Element as key. This cache handles Element -> Selector caching.
  * @param {Map<String, Boolean>} options.isUniqueCache Provide a cache to improve performance of repeated selector generation - it is the responsibility of the caller to handle cache invalidation. Caching is performed using the input Element as key. This cache handles Selector -> isUnique caching.
+ * @param {Object} options.significantAncestors Configuration for forcing inclusion of specific attributes from ancestors
+ * @param {Array} options.significantAncestors.attributes Array of {attribute, value} objects specifying which attributes to include
+ * @param {String} options.significantAncestors.type Either 'all' (include all matching ancestors) or 'closest' (include only nearest ancestor)
+ * @param {Map<Element, String[]>} options.significantAttributesCache Cache for significant attribute computation
  * @return {String}
  * @api private
  */
@@ -209,7 +275,9 @@ export default function unique( el, options={} ) {
     attributesToIgnore= ['id', 'class', 'length'],
     filter,
     selectorCache,
-    isUniqueCache
+    isUniqueCache,
+    significantAncestors,
+    significantAttributesCache
   } = options;
   // If filter was provided wrap it to ensure a default value of `true` is returned if the provided function fails to return a value
   const normalizedFilter = filter && function(type, key, value) {
@@ -219,6 +287,53 @@ export default function unique( el, options={} ) {
     }
     return result
   }
+
+  // Pre-scan for significant ancestors if configured
+  let significantAncestorsMap = null;
+  if (significantAncestors && significantAncestors.attributes && significantAncestors.attributes.length > 0) {
+    // Step 1: Collect ALL significant ancestors (cache-friendly, type-agnostic)
+    const allSignificantAncestors = [];
+    let scanElement = el;
+
+    while (scanElement) {
+      const significantAttrsData = getSignificantAttributes(scanElement, significantAncestors, significantAttributesCache);
+      
+      if (significantAttrsData.selectors.length > 0) {
+        allSignificantAncestors.push({
+          element: scanElement,
+          data: significantAttrsData
+        });
+      }
+
+      scanElement = scanElement.parentElement;
+    }
+
+    // Step 2: Apply type-specific filtering
+    let filteredAncestors;
+    if (significantAncestors.type === 'closest' && allSignificantAncestors.length > 0) {
+      // For 'closest' mode, only include the nearest (first) ancestor
+      filteredAncestors = [allSignificantAncestors[0]];
+    } else {
+      // For 'all' mode (or default), include all ancestors
+      filteredAncestors = allSignificantAncestors;
+    }
+
+    // Step 3: Build map and set furthest ancestor references
+    // Insert in reverse order (furthest to closest) so Map maintains deterministic order
+    if (filteredAncestors.length > 0) {
+      significantAncestorsMap = new Map();
+      // The furthest ancestor is the last one in the filtered list (since we iterate child->parent)
+      const furthestAncestor = filteredAncestors[filteredAncestors.length - 1].element;
+      
+      // Insert in reverse order so Map maintains furthest->closest order
+      for (let i = filteredAncestors.length - 1; i >= 0; i--) {
+        const { element, data } = filteredAncestors[i];
+        data.furthestAncestor = furthestAncestor;
+        significantAncestorsMap.set(element, data);
+      }
+    }
+  }
+
   const allSelectors = [];
 
   let currentElement = el
@@ -226,12 +341,40 @@ export default function unique( el, options={} ) {
     let selector = selectorCache ? selectorCache.get(currentElement) : undefined
 
     if (!selector) {
-      selector = getUniqueSelector(
-        currentElement,
-        selectorTypes,
-        attributesToIgnore,
-        normalizedFilter
-      )
+      // Check if this element has significant attributes
+      const significantAttrsData = significantAncestorsMap ? significantAncestorsMap.get(currentElement) : null;
+      
+      if (significantAttrsData && significantAttrsData.selectors.length > 0) {
+        // Start with significant attributes
+        selector = significantAttrsData.selectors.join('');
+        
+        // Test if significant attributes alone make it unique within parent
+        if (!testUniqueness(currentElement, selector)) {
+          // Not unique, need to add the regular unique selector
+          // Avoid duplicate attributes by ignoring the ones we're already including
+          // Use only the attribute names that actually matched for this element
+          const mergedAttributesToIgnore = [...attributesToIgnore, ...significantAttrsData.attributeNames];
+          
+          const regularSelector = getUniqueSelector(
+            currentElement,
+            selectorTypes,
+            mergedAttributesToIgnore,
+            normalizedFilter
+          );
+          
+          // Combine significant attributes with regular selector (guarantees uniqueness)
+          selector = significantAttrsData.selectors.join('') + regularSelector;
+        }
+      } else {
+        // No significant attributes, use regular selector generation
+        selector = getUniqueSelector(
+          currentElement,
+          selectorTypes,
+          attributesToIgnore,
+          normalizedFilter
+        );
+      }
+      
       if (selectorCache) {
         selectorCache.set(currentElement, selector)
        }
@@ -260,8 +403,49 @@ export default function unique( el, options={} ) {
       }
     }
 
+    // Only return early if:
+    // 1. The selector is unique, AND
+    // 2. Either we don't have significant ancestors, OR we can compose a unique selector with them
     if (isUniqueSelector) {
-      return maybeUniqueSelector
+      // Check if we have significant ancestors
+      if (!significantAncestorsMap || significantAncestorsMap.size === 0) {
+        return maybeUniqueSelector;
+      }
+      
+      // We have a unique selector but need to include significant ancestors
+      // Map is already in furthest->closest order, no sorting needed
+      // Only include ancestors that are actual parents (not elements already in the path)
+      const ancestorSelectors = [];
+      for (const [element, data] of significantAncestorsMap) {
+        // Only include if this element is an ancestor of currentElement (not currentElement itself or below)
+        if (element !== currentElement && isAncestor(element, currentElement)) {
+          ancestorSelectors.push(data.selectors.join(''));
+        }
+      }
+      
+      if (ancestorSelectors.length === 0) {
+        // No ancestors to prepend, just return the current unique selector
+        return maybeUniqueSelector;
+      }
+      
+      // Build selector with descendant combinators (space, not >)
+      const composedSelector = ancestorSelectors.join(' ') + ' ' + maybeUniqueSelector;
+      
+      // Verify the composed selector is still unique
+      let composedIsUnique = isUniqueCache ? isUniqueCache.get(composedSelector) : undefined;
+      if (composedIsUnique === undefined) {
+        composedIsUnique = isUnique(el, composedSelector);
+        if (isUniqueCache) {
+          isUniqueCache.set(composedSelector, composedIsUnique);
+        }
+      }
+      
+      if (composedIsUnique) {
+        // Great! We can return early with the composed selector
+        return composedSelector;
+      }
+      
+      // If not unique, fall back to normal iteration (continue to next parent)
     }
 
     // Using parentElement here (rather than parentNode) to

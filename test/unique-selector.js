@@ -493,4 +493,572 @@ describe( 'Unique Selector Tests', () =>
     const uniqueSelector = unique( el );
     expect( uniqueSelector ).to.equal( null );
   })
+
+  describe('significantAncestors', () => {
+    describe('all mode', () => {
+      it('should include all matching ancestors with single attribute', () => {
+        $( 'body' ).append(`
+          <div data-cy="foo">
+            <div data-cy="bar">
+              <div data-cy="baz">
+                <button id="my-button">Test</button>
+              </div>
+            </div>
+          </div>
+        `);
+        
+        const button = $( '#my-button' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }],
+            type: 'all'
+          }
+        });
+        
+        expect( uniqueSelector ).to.equal( '[data-cy="foo"] [data-cy="bar"] [data-cy="baz"] #my-button' );
+      });
+
+      it('should include multiple attributes on same ancestor', () => {
+        $( 'body' ).append(`
+          <div data-cy="foo" data-tyler="buzz">
+            <div data-cy="bar" data-tyler="is cool">
+              <button id="my-button">Test</button>
+            </div>
+          </div>
+        `);
+        
+        const button = $( '#my-button' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }, {
+              attribute: 'data-tyler',
+              value: 'is cool'
+            }],
+            type: 'all'
+          }
+        });
+        
+        expect( uniqueSelector ).to.equal( '[data-cy="foo"] [data-cy="bar"][data-tyler="is cool"] #my-button' );
+      });
+
+      it('should work when element itself has significant attributes', () => {
+        $( 'body' ).append(`
+          <div data-cy="foo">
+            <button data-cy="my-button">Test</button>
+          </div>
+        `);
+        
+        const button = $( 'button' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }],
+            type: 'all'
+          }
+        });
+        
+        expect( uniqueSelector ).to.equal( '[data-cy="foo"] [data-cy="my-button"]' );
+      });
+
+      it('should maintain uniqueness by adding nth-child when needed', () => {
+        $( 'body' ).append(`
+          <div data-cy="container">
+            <button>First</button>
+            <button>Second</button>
+            <button>Third</button>
+          </div>
+        `);
+        
+        const secondButton = $( 'button' ).get( 1 );
+        const uniqueSelector = unique( secondButton, {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }],
+            type: 'all'
+          }
+        });
+        
+        // Should include data-cy and add nth-child for uniqueness
+        expect( uniqueSelector ).to.include( '[data-cy="container"]' );
+        expect( uniqueSelector ).to.include( ':nth-child(2)' );
+      });
+
+      it('should respect regex pattern matching', () => {
+        $( 'body' ).append(`
+          <div data-cy="foo" data-test="match-this">
+            <div data-cy="bar" data-test="skip-this">
+              <button id="btn">Test</button>
+            </div>
+          </div>
+        `);
+        
+        const button = $( '#btn' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }, {
+              attribute: 'data-test',
+              value: 'match-.*'
+            }],
+            type: 'all'
+          }
+        });
+        
+        // Should include data-cy from both, but data-test only from first div
+        expect( uniqueSelector ).to.equal( '[data-cy="foo"][data-test="match-this"] [data-cy="bar"] #btn' );
+      });
+
+      it('should work with no matching ancestors', () => {
+        $( 'body' ).append(`
+          <div>
+            <button id="btn">Test</button>
+          </div>
+        `);
+        
+        const button = $( '#btn' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }],
+            type: 'all'
+          }
+        });
+        
+        // Should fall back to normal selector generation
+        expect( uniqueSelector ).to.equal( '#btn' );
+      });
+    });
+
+    describe('closest mode', () => {
+      it('should include only nearest matching ancestor', () => {
+        $( 'body' ).append(`
+          <div data-cy="foo">
+            <div data-cy="bar">
+              <div data-cy="baz">
+                <button id="my-button">Test</button>
+              </div>
+            </div>
+          </div>
+        `);
+        
+        const button = $( '#my-button' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }],
+            type: 'closest'
+          }
+        });
+        
+        expect( uniqueSelector ).to.equal( '[data-cy="baz"] #my-button' );
+      });
+
+      it('should include multiple attributes from same closest ancestor', () => {
+        $( 'body' ).append(`
+          <div data-cy="foo" data-tyler="buzz">
+            <div data-cy="bar" data-tyler="is cool">
+              <button id="my-button">Test</button>
+            </div>
+          </div>
+        `);
+        
+        const button = $( '#my-button' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }, {
+              attribute: 'data-tyler',
+              value: 'is cool'
+            }],
+            type: 'closest'
+          }
+        });
+        
+        expect( uniqueSelector ).to.equal( '[data-cy="bar"][data-tyler="is cool"] #my-button' );
+      });
+
+      it('should work when element itself is the closest', () => {
+        $( 'body' ).append(`
+          <div data-cy="foo">
+            <button data-cy="my-button" id="btn">Test</button>
+          </div>
+        `);
+        
+        const button = $( '#btn' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }],
+            type: 'closest'
+          }
+        });
+        
+        expect( uniqueSelector ).to.equal( '[data-cy="my-button"]' );
+      });
+    });
+
+    describe('caching', () => {
+      it('should use significantAttributesCache when provided', () => {
+        $( 'body' ).append(`
+          <div data-cy="foo">
+            <button id="btn1">Test 1</button>
+            <button id="btn2">Test 2</button>
+          </div>
+        `);
+        
+        const cache = new Map();
+        const button1 = $( '#btn1' ).get( 0 );
+        const button2 = $( '#btn2' ).get( 0 );
+        
+        const options = {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }],
+            type: 'all'
+          },
+          significantAttributesCache: cache
+        };
+        
+        const selector1 = unique( button1, options );
+        expect( selector1 ).to.equal( '[data-cy="foo"] #btn1' );
+        
+        // Cache should have been populated
+        expect( cache.size ).to.be.greaterThan( 0 );
+        
+        // Second call should reuse cache
+        const selector2 = unique( button2, options );
+        expect( selector2 ).to.equal( '[data-cy="foo"] #btn2' );
+      });
+
+      it('should work with same cache across different type configurations', () => {
+        $( 'body' ).append(`
+          <div data-cy="outer">
+            <div data-cy="middle">
+              <div data-cy="inner">
+                <button id="btn">Test</button>
+              </div>
+            </div>
+          </div>
+        `);
+        
+        const cache = new Map();
+        const button = $( '#btn' ).get( 0 );
+        
+        // First call with 'all' type - caches all ancestors
+        const selector1 = unique( button, {
+          significantAncestors: {
+            attributes: [{ attribute: 'data-cy', value: '*' }],
+            type: 'all'
+          },
+          significantAttributesCache: cache
+        });
+        expect( selector1 ).to.equal( '[data-cy="outer"] [data-cy="middle"] [data-cy="inner"] #btn' );
+        
+        const cacheSize = cache.size;
+        expect( cacheSize ).to.be.greaterThan( 0 );
+        
+        // Second call with SAME element but 'closest' type
+        // Should reuse cached data but apply different filtering
+        const selector2 = unique( button, {
+          significantAncestors: {
+            attributes: [{ attribute: 'data-cy', value: '*' }],
+            type: 'closest'
+          },
+          significantAttributesCache: cache
+        });
+        expect( selector2 ).to.equal( '[data-cy="inner"] #btn' );
+        
+        // Cache should not have grown (all data was already cached)
+        expect( cache.size ).to.equal( cacheSize );
+      });
+    });
+
+    describe('edge cases', () => {
+      it('should handle empty attribute value', () => {
+        $( 'body' ).append(`
+          <div data-cy="">
+            <button id="btn">Test</button>
+          </div>
+        `);
+        
+        const button = $( '#btn' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }],
+            type: 'all'
+          }
+        });
+        
+        expect( uniqueSelector ).to.equal( '[data-cy=""] #btn' );
+      });
+
+      it('should handle invalid regex pattern gracefully', () => {
+        $( 'body' ).append(`
+          <div data-cy="foo">
+            <button id="btn">Test</button>
+          </div>
+        `);
+        
+        const button = $( '#btn' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '[invalid('
+            }],
+            type: 'all'
+          }
+        });
+        
+        // Should fall back to normal selector generation
+        expect( uniqueSelector ).to.equal( '#btn' );
+      });
+
+      it('should not affect performance when option not provided', () => {
+        $( 'body' ).append(`
+          <div data-cy="foo">
+            <button id="btn">Test</button>
+          </div>
+        `);
+        
+        const button = $( '#btn' ).get( 0 );
+        const uniqueSelector = unique( button );
+        
+        // Should work as normal
+        expect( uniqueSelector ).to.equal( '#btn' );
+      });
+
+      it('should not duplicate attributes when significant attribute is also in selectorTypes', () => {
+        $( 'body' ).append(`
+          <div data-test="container">
+            <button data-test="btn">Button 1</button>
+            <button data-test="btn">Button 2</button>
+          </div>
+        `);
+        
+        const button1 = $( 'button' ).get( 0 );
+        const uniqueSelector = unique( button1, {
+          selectorTypes: ['data-test', 'nth-child'],
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-test',
+              value: '*'
+            }],
+            type: 'all'
+          }
+        });
+        
+        // [data-test="btn"] alone is not unique, needs nth-child
+        // Should not have duplicate [data-test="btn"][data-test="btn"]
+        expect( uniqueSelector ).to.equal( '[data-test="container"] [data-test="btn"]:nth-child(1)' );
+        // Verify no duplicates in the selector
+        const matches = uniqueSelector.match(/\[data-test="btn"\]/g);
+        expect( matches.length ).to.equal( 1 );
+      });
+
+      it('should avoid redundancy when combining significant attributes with regular selector', () => {
+        $( 'body' ).append(`
+          <div data-cy="outer">
+            <div data-cy="inner">
+              <span data-cy="item"></span>
+              <span data-cy="item"></span>
+            </div>
+          </div>
+        `);
+        
+        const span1 = $( 'span' ).get( 0 );
+        const uniqueSelector = unique( span1, {
+          selectorTypes: ['data-cy', 'tag', 'nth-child'],
+          significantAncestors: {
+            attributes: [{
+              attribute: 'data-cy',
+              value: '*'
+            }],
+            type: 'all'
+          }
+        });
+        
+        // [data-cy="item"] alone is not unique, needs nth-child
+        // Should not have duplicate [data-cy="item"][data-cy="item"]
+        expect( uniqueSelector ).to.equal( '[data-cy="outer"] [data-cy="inner"] [data-cy="item"]:nth-child(1)' );
+        // Each data-cy="item" should appear exactly once
+        const itemMatches = uniqueSelector.match(/\[data-cy="item"\]/g);
+        expect( itemMatches.length ).to.equal( 1 );
+      });
+
+      it('should handle multiple significant attributes without duplication', () => {
+        $( 'body' ).append(`
+          <div data-test="div1" data-cy="container">
+            <button data-test="btn" data-cy="btn">Button 1</button>
+            <button data-test="btn" data-cy="btn">Button 2</button>
+          </div>
+        `);
+        
+        const button = $( 'button' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          selectorTypes: ['data-test', 'data-cy', 'tag', 'nth-child'],
+          significantAncestors: {
+            attributes: [
+              { attribute: 'data-test', value: '*' },
+              { attribute: 'data-cy', value: '*' }
+            ],
+            type: 'all'
+          }
+        });
+        
+        // [data-test="btn"][data-cy="btn"] alone is not unique, needs nth-child
+        // Should not have duplicates like [data-test="btn"][data-test="btn"]
+        expect( uniqueSelector ).to.equal( '[data-test="div1"][data-cy="container"] [data-test="btn"][data-cy="btn"]:nth-child(1)' );
+        // Verify no duplicates
+        expect( (uniqueSelector.match(/data-test="btn"/g) || []).length ).to.equal( 1 );
+        expect( (uniqueSelector.match(/data-cy="btn"/g) || []).length ).to.equal( 1 );
+      });
+
+      it('should only ignore attributes that actually matched, not all configured attributes', () => {
+        $( 'body' ).append(`
+          <div data-cy="container">
+            <button data-other="unique-value">Button 1</button>
+            <button data-other="unique-value2">Button 2</button>
+          </div>
+        `);
+        
+        const button1 = $( 'button' ).get( 0 );
+        const uniqueSelector = unique( button1, {
+          selectorTypes: ['data-cy', 'data-other', 'nth-child'],
+          significantAncestors: {
+            attributes: [
+              { attribute: 'data-cy', value: '*' },
+              { attribute: 'data-test', value: '*' }  // This won't match (element doesn't have it)
+            ],
+            type: 'all'
+          }
+        });
+        
+        // Should include data-cy from ancestor (matched significant attribute)
+        // AND data-other from button (not a significant attribute, so not ignored)
+        // data-test should NOT be ignored since it didn't match
+        expect( uniqueSelector ).to.equal( '[data-cy="container"] [data-other="unique-value"]' );
+      });
+
+      it('should combine descendant selectors for significant ancestors with direct child selectors when needed', () => {
+        $( 'body' ).append(`
+          <div data-cy="outer">
+            <div data-cy="inner">
+              <div class="path">
+                <div class="to">
+                  <button>Button 1</button>
+                </div>
+              </div>
+            </div>
+            <div data-cy="inner">
+              <div class="path">
+                <div class="to">
+                  <button>Button 2</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `);
+        
+        const button1 = $( 'button' ).get( 0 );
+        const uniqueSelector = unique( button1, {
+          selectorTypes: ['data-cy', 'class', 'tag', 'nth-child'],
+          significantAncestors: {
+            attributes: [{ attribute: 'data-cy', value: '*' }],
+            type: 'all'
+          }
+        });
+        
+        // [data-cy="outer"] [data-cy="inner"] button is NOT unique (both buttons match)
+        // So it falls back to building the full path with direct child selectors
+        // Result should have:
+        // - Descendant selectors (space) for significant ancestors
+        // - Direct child selectors (>) for the built path
+        expect( uniqueSelector ).to.include( '[data-cy="outer"]' );
+        expect( uniqueSelector ).to.include( '[data-cy="inner"]' );
+        expect( uniqueSelector ).to.match( /\.path > \.to > button|\.path > \.to > :nth-child\(1\)/ );
+        
+        // Verify the selector is actually unique
+        const root = button1.getRootNode();
+        const matches = root.querySelectorAll(uniqueSelector);
+        expect( matches.length ).to.equal( 1 );
+        expect( matches[0] ).to.equal( button1 );
+      });
+
+      it('should build complete path with all direct child selectors when optimization fails', () => {
+        $( 'body' ).append(`
+          <div data-test="1">
+            <div data-cy="outer">
+              <div data-cy="inner">
+                <button>Button 1</button>
+              </div>
+            </div>
+          </div>
+          <div data-test="1">
+            <div data-cy="outer">
+              <div data-cy="inner">
+                <button>Button 2</button>
+              </div>
+            </div>
+          </div>
+        `);
+        
+        const button1 = $( 'button' ).get( 0 );
+        const uniqueSelector = unique( button1, {
+          selectorTypes: ['data-test', 'data-cy', 'tag', 'nth-child'],
+          significantAncestors: {
+            attributes: [{ attribute: 'data-cy', value: '*' }],
+            type: 'all'
+          }
+        });
+        
+        // [data-cy="outer"] [data-cy="inner"] button is NOT unique (duplicate structure)
+        // Falls back to normal iteration which builds full path with >
+        // Should include ALL ancestors (both significant and non-significant) with >
+        
+        // Should include significant ancestors
+        expect( uniqueSelector ).to.include( '[data-cy="outer"]' );
+        expect( uniqueSelector ).to.include( '[data-cy="inner"]' );
+        
+        // Should include a non-significant ancestor selector (nth-child or data-test)
+        expect( uniqueSelector ).to.match( /:nth-child\(1\)|\[data-test="1"\]/ );
+        
+        // Should use > for all relationships (no space descendant selectors in final result)
+        // All parts should be connected with >
+        expect( uniqueSelector.split(' ').filter(part => part === '>').length ).to.be.greaterThan( 2 );
+        expect( uniqueSelector ).to.match( /> \[data-cy="outer"\] > \[data-cy="inner"\] > button/ );
+        
+        // Verify the selector is actually unique
+        const root = button1.getRootNode();
+        const matches = root.querySelectorAll(uniqueSelector);
+        expect( matches.length ).to.equal( 1 );
+        expect( matches[0] ).to.equal( button1 );
+      });
+    });
+  });
 } );
