@@ -199,24 +199,244 @@ function isAncestor(ancestor, element) {
 }
 
 /**
+ * Insert significant attributes into a selector in the correct position
+ * CSS selector order: tag > id > class > attributes > pseudo-selectors
+ * @param {String} regularSelector - The base selector (e.g., 'div', '#id', ':nth-child(1)')
+ * @param {String} significantAttrs - Significant attributes to insert (e.g., '[data-cy="foo"]')
+ * @return {String} Combined selector with proper ordering
+ */
+function insertSignificantAttributes(regularSelector, significantAttrs) {
+  if (!significantAttrs) {
+    return regularSelector;
+  }
+  
+  // Find the first pseudo-selector (starts with : but not ::)
+  const pseudoMatch = regularSelector.match(/(?<!:):(?!:)/);
+  
+  if (pseudoMatch) {
+    // Insert significant attributes before pseudo-selector
+    const insertPos = pseudoMatch.index;
+    return regularSelector.slice(0, insertPos) + significantAttrs + regularSelector.slice(insertPos);
+  }
+  
+  // No pseudo-selector, append significant attributes at end
+  // This handles cases like 'div', '#id', '.class', 'div.class', etc.
+  return regularSelector + significantAttrs;
+}
+
+/**
+ * Build a map of significant ancestors for an element
+ * @param {Element} el - The target element
+ * @param {Object} significantAncestors - Configuration for significant ancestors
+ * @param {Map<Element, Object>} significantAttributesCache - Optional cache
+ * @return {Object|null} Object with map (Map<Element, Object>) and orderedElements (Array of elements, furthest to closest), or null if none found
+ */
+function buildSignificantAncestorsMap(el, significantAncestors, significantAttributesCache) {
+  if (!significantAncestors || !significantAncestors.attributes || significantAncestors.attributes.length === 0) {
+    return null;
+  }
+
+  // Step 1: Collect ALL significant ancestors (cache-friendly, type-agnostic)
+  const allSignificantAncestors = [];
+  const allScannedElements = []; // Track ALL scanned elements (even those without significant attrs)
+  let scanElement = el;
+  let foundCachedParents = null;
+
+  // Scan up until cache hit or root
+  while (scanElement) {
+    // Check cache first
+    if (significantAttributesCache && significantAttributesCache.has(scanElement)) {
+      const cachedData = significantAttributesCache.get(scanElement);
+      
+      // Add this element to scanned list
+      allScannedElements.push({ element: scanElement, data: cachedData });
+      
+      // Add to significant ancestors if it has matched attributes
+      if (cachedData.matchedAttributes && Object.keys(cachedData.matchedAttributes).length > 0) {
+        allSignificantAncestors.push({
+          element: scanElement,
+          data: cachedData
+        });
+      }
+      
+      // Get cached parents (they're already complete)
+      foundCachedParents = cachedData.significantParents || [];
+      break; // Stop! We have the rest via cache
+    }
+    
+    // Cache miss - compute and track
+    const data = getSignificantAttributes(
+      scanElement,
+      significantAncestors,
+      null, // Don't pass cache here - we're handling it manually
+      [] // Empty parent list for now
+    );
+    
+    // Track this element (regardless of whether it has significant attrs)
+    allScannedElements.push({ element: scanElement, data: data });
+    
+    // Add to significant ancestors only if it has matched attributes
+    if (data.matchedAttributes && Object.keys(data.matchedAttributes).length > 0) {
+      allSignificantAncestors.push({
+        element: scanElement,
+        data: data
+      });
+    }
+    
+    scanElement = scanElement.parentElement;
+  }
+
+  // Append cached parents to our collected significant ancestors
+  if (foundCachedParents && foundCachedParents.length > 0) {
+    for (const parent of foundCachedParents) {
+      const parentData = significantAttributesCache.get(parent);
+      if (parentData && parentData.matchedAttributes && Object.keys(parentData.matchedAttributes).length > 0) {
+        allSignificantAncestors.push({
+          element: parent,
+          data: parentData
+        });
+      }
+    }
+  }
+
+  // Update ALL scanned element cache entries with complete parent chain
+  // This includes elements without significant attrs - they still benefit from knowing their significant parents
+  if (significantAttributesCache && allScannedElements.length > 0) {
+    // Build the list of significant parent elements (from allSignificantAncestors)
+    const significantParentElements = [
+      ...allSignificantAncestors.map(item => item.element),
+      ...(foundCachedParents || [])
+    ];
+    
+    for (let i = 0; i < allScannedElements.length; i++) {
+      const { element, data } = allScannedElements[i];
+      
+      // Store all significant ancestors ABOVE this element
+      // Filter to only include those that are actual parents of this element
+      data.significantParents = significantParentElements.filter(parent => 
+        parent !== element && isAncestor(parent, element)
+      );
+      
+      // Update cache with complete parent chain
+      significantAttributesCache.set(element, data);
+    }
+  }
+
+  // Step 2: Apply per-attribute type-specific filtering
+  // Get type configuration for each attribute
+  const attributeTypeMap = new Map(); // attrName -> type
+  const defaultType = significantAncestors.type || 'all'; // Global fallback
+  
+  for (const attrConfig of significantAncestors.attributes) {
+    const attrType = attrConfig.type || defaultType;
+    attributeTypeMap.set(attrConfig.attribute, attrType);
+  }
+  
+  // Build a map of attribute name -> list of elements with that attribute
+  const attributeElementsMap = new Map(); // attrName -> [{element, selector}]
+  
+  for (const { element, data } of allSignificantAncestors) {
+    for (const [attrName, selector] of Object.entries(data.matchedAttributes)) {
+      if (!attributeElementsMap.has(attrName)) {
+        attributeElementsMap.set(attrName, []);
+      }
+      attributeElementsMap.get(attrName).push({
+        element,
+        selector
+      });
+    }
+  }
+  
+  // Filter each attribute's elements based on its type (from config, not cache)
+  const filteredByAttribute = new Map(); // element -> Set of attribute selectors to include
+  
+  for (const [attrName, elementsWithAttr] of attributeElementsMap) {
+    if (elementsWithAttr.length === 0) continue;
+    
+    const attrType = attributeTypeMap.get(attrName) || defaultType;
+    let elementsToInclude;
+    
+    if (attrType === 'closest') {
+      // Only include the first (closest) element with this attribute
+      elementsToInclude = [elementsWithAttr[0]];
+    } else {
+      // Include all elements with this attribute
+      elementsToInclude = elementsWithAttr;
+    }
+    
+    // Add to filtered map
+    for (const { element, selector } of elementsToInclude) {
+      if (!filteredByAttribute.has(element)) {
+        filteredByAttribute.set(element, new Set());
+      }
+      filteredByAttribute.get(element).add(selector);
+    }
+  }
+
+  // Step 3: Build final map with merged selectors per element
+  if (filteredByAttribute.size === 0) {
+    return null;
+  }
+
+  const significantAncestorsMap = new Map();
+  const orderedElements = [];
+  
+  // Build list of unique elements in furthest->closest order
+  const uniqueElements = [];
+  for (const { element } of allSignificantAncestors) {
+    if (filteredByAttribute.has(element) && !uniqueElements.includes(element)) {
+      uniqueElements.push(element);
+    }
+  }
+  
+  // Insert in reverse order (furthest to closest)
+  for (let i = uniqueElements.length - 1; i >= 0; i--) {
+    const element = uniqueElements[i];
+    const selectors = Array.from(filteredByAttribute.get(element));
+    const originalData = allSignificantAncestors.find(item => item.element === element).data;
+    
+    // Build attribute names list from matched selectors
+    const attributeNames = [];
+    for (const [attrName, selector] of Object.entries(originalData.matchedAttributes)) {
+      if (selectors.includes(selector)) {
+        attributeNames.push(attrName);
+      }
+    }
+    
+    const mergedData = {
+      selectors,
+      attributeNames,
+      matchedAttributes: originalData.matchedAttributes,
+      significantParents: originalData.significantParents
+    };
+    
+    significantAncestorsMap.set(element, mergedData);
+    orderedElements.push(element);
+  }
+
+  return { map: significantAncestorsMap, orderedElements };
+}
+
+/**
  * Get significant attributes for an element based on configuration
+ * Returns attribute-level detail for filtering (cache stores raw data without types)
  * @param {Element} element
  * @param {Object} significantAncestors
  * @param {Map<Element, Object>} cache
- * @return {Object} Object with selectors (array of attribute selectors) and attributeNames (array of matched attribute names)
+ * @param {Array} allSignificantAncestorsSoFar - Array of {element, data} objects found so far
+ * @return {Object} Object with matchedAttributes (map of attrName -> selector), and significantParents
  */
-function getSignificantAttributes(element, significantAncestors, cache) {
+function getSignificantAttributes(element, significantAncestors, cache, allSignificantAncestorsSoFar = []) {
   if (!significantAncestors || !significantAncestors.attributes) {
-    return { selectors: [], attributeNames: [] };
+    return { matchedAttributes: {}, significantParents: null };
   }
 
-  // Check cache first
+  // Check cache first - cache stores raw matched attributes (no types)
   if (cache && cache.has(element)) {
     return cache.get(element);
   }
 
-  const matchingSelectors = [];
-  const matchingAttributeNames = [];
+  const matchedAttributes = {}; // Map attribute name to selector string
 
   for (const { attribute, value = '*' } of significantAncestors.attributes) {
     const attributeValue = element.getAttribute(attribute);
@@ -228,10 +448,9 @@ function getSignificantAttributes(element, significantAncestors, cache) {
       try {
         const regex = new RegExp(pattern);
         if (regex.test(attributeValue)) {
-          // Build the attribute selector
-          // Always include the value in quotes, even if it's an empty string
-          matchingSelectors.push(`[${attribute}="${attributeValue}"]`);
-          matchingAttributeNames.push(attribute);
+          // Build the attribute selector (store without type info)
+          const selector = `[${attribute}="${attributeValue}"]`;
+          matchedAttributes[attribute] = selector;
         }
       } catch (e) {
         // Invalid regex pattern, skip this attribute
@@ -240,7 +459,11 @@ function getSignificantAttributes(element, significantAncestors, cache) {
     }
   }
 
-  const result = { selectors: matchingSelectors, attributeNames: matchingAttributeNames };
+  const result = {
+    matchedAttributes,
+    // Store references to all significant ancestors found so far (for cache optimization)
+    significantParents: allSignificantAncestorsSoFar.map(item => item.element)
+  };
 
   // Store in cache if provided
   if (cache) {
@@ -263,8 +486,11 @@ function getSignificantAttributes(element, significantAncestors, cache) {
  * @param {Map<Element, String>} options.selectorCache Provide a cache to improve performance of repeated selector generation - it is the responsibility of the caller to handle cache invalidation. Caching is performed using the input Element as key. This cache handles Element -> Selector caching.
  * @param {Map<String, Boolean>} options.isUniqueCache Provide a cache to improve performance of repeated selector generation - it is the responsibility of the caller to handle cache invalidation. Caching is performed using the input Element as key. This cache handles Selector -> isUnique caching.
  * @param {Object} options.significantAncestors Configuration for forcing inclusion of specific attributes from ancestors
- * @param {Array} options.significantAncestors.attributes Array of {attribute, value} objects specifying which attributes to include
- * @param {String} options.significantAncestors.type Either 'all' (include all matching ancestors) or 'closest' (include only nearest ancestor)
+ * @param {Array} options.significantAncestors.attributes Array of {attribute, value, type?} objects specifying which attributes to include
+ * @param {String} options.significantAncestors.attributes[].attribute The attribute name (e.g., 'data-cy')
+ * @param {String} options.significantAncestors.attributes[].value Regex pattern to match attribute values (default: '*' for wildcard)
+ * @param {String} options.significantAncestors.attributes[].type Optional per-attribute type: 'all' (include all matching ancestors) or 'closest' (include only nearest). Falls back to global type.
+ * @param {String} options.significantAncestors.type Optional global type fallback when per-attribute type not specified. Defaults to 'all'.
  * @param {Map<Element, String[]>} options.significantAttributesCache Cache for significant attribute computation
  * @return {String}
  * @api private
@@ -289,50 +515,9 @@ export default function unique( el, options={} ) {
   }
 
   // Pre-scan for significant ancestors if configured
-  let significantAncestorsMap = null;
-  if (significantAncestors && significantAncestors.attributes && significantAncestors.attributes.length > 0) {
-    // Step 1: Collect ALL significant ancestors (cache-friendly, type-agnostic)
-    const allSignificantAncestors = [];
-    let scanElement = el;
-
-    while (scanElement) {
-      const significantAttrsData = getSignificantAttributes(scanElement, significantAncestors, significantAttributesCache);
-      
-      if (significantAttrsData.selectors.length > 0) {
-        allSignificantAncestors.push({
-          element: scanElement,
-          data: significantAttrsData
-        });
-      }
-
-      scanElement = scanElement.parentElement;
-    }
-
-    // Step 2: Apply type-specific filtering
-    let filteredAncestors;
-    if (significantAncestors.type === 'closest' && allSignificantAncestors.length > 0) {
-      // For 'closest' mode, only include the nearest (first) ancestor
-      filteredAncestors = [allSignificantAncestors[0]];
-    } else {
-      // For 'all' mode (or default), include all ancestors
-      filteredAncestors = allSignificantAncestors;
-    }
-
-    // Step 3: Build map and set furthest ancestor references
-    // Insert in reverse order (furthest to closest) so Map maintains deterministic order
-    if (filteredAncestors.length > 0) {
-      significantAncestorsMap = new Map();
-      // The furthest ancestor is the last one in the filtered list (since we iterate child->parent)
-      const furthestAncestor = filteredAncestors[filteredAncestors.length - 1].element;
-      
-      // Insert in reverse order so Map maintains furthest->closest order
-      for (let i = filteredAncestors.length - 1; i >= 0; i--) {
-        const { element, data } = filteredAncestors[i];
-        data.furthestAncestor = furthestAncestor;
-        significantAncestorsMap.set(element, data);
-      }
-    }
-  }
+  const significantAncestorsResult = buildSignificantAncestorsMap(el, significantAncestors, significantAttributesCache);
+  const significantAncestorsMap = significantAncestorsResult ? significantAncestorsResult.map : null;
+  const significantAncestorsOrdered = significantAncestorsResult ? significantAncestorsResult.orderedElements : null;
 
   const allSelectors = [];
 
@@ -344,7 +529,7 @@ export default function unique( el, options={} ) {
       // Check if this element has significant attributes
       const significantAttrsData = significantAncestorsMap ? significantAncestorsMap.get(currentElement) : null;
       
-      if (significantAttrsData && significantAttrsData.selectors.length > 0) {
+      if (significantAttrsData && significantAttrsData.selectors && significantAttrsData.selectors.length > 0) {
         // Start with significant attributes
         selector = significantAttrsData.selectors.join('');
         
@@ -362,8 +547,9 @@ export default function unique( el, options={} ) {
             normalizedFilter
           );
           
-          // Combine significant attributes with regular selector (guarantees uniqueness)
-          selector = significantAttrsData.selectors.join('') + regularSelector;
+          // Combine significant attributes with regular selector in correct CSS order
+          // (tag > id > class > attributes > pseudo-selectors)
+          selector = insertSignificantAttributes(regularSelector, significantAttrsData.selectors.join(''));
         }
       } else {
         // No significant attributes, use regular selector generation
@@ -413,12 +599,14 @@ export default function unique( el, options={} ) {
       }
       
       // We have a unique selector but need to include significant ancestors
-      // Map is already in furthest->closest order, no sorting needed
-      // Only include ancestors that are actual parents (not elements already in the path)
+      // Use the ordered array to efficiently get ancestors above currentElement
       const ancestorSelectors = [];
-      for (const [element, data] of significantAncestorsMap) {
-        // Only include if this element is an ancestor of currentElement (not currentElement itself or below)
+      
+      // significantAncestorsOrdered is already in furthest→closest order
+      // Filter to only include ancestors above currentElement
+      for (const element of significantAncestorsOrdered) {
         if (element !== currentElement && isAncestor(element, currentElement)) {
+          const data = significantAncestorsMap.get(element);
           ancestorSelectors.push(data.selectors.join(''));
         }
       }
@@ -445,7 +633,7 @@ export default function unique( el, options={} ) {
         return composedSelector;
       }
       
-      // If not unique, fall back to normal iteration (continue to next parent)
+      // If not unique, continue to next parent (fallback to normal iteration)
     }
 
     // Using parentElement here (rather than parentNode) to

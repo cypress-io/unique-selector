@@ -589,8 +589,7 @@ describe( 'Unique Selector Tests', () =>
         });
         
         // Should include data-cy and add nth-child for uniqueness
-        expect( uniqueSelector ).to.include( '[data-cy="container"]' );
-        expect( uniqueSelector ).to.include( ':nth-child(2)' );
+        expect( uniqueSelector ).to.equal( '[data-cy="container"] > :nth-child(2)' );
       });
 
       it('should respect regex pattern matching', () => {
@@ -715,6 +714,33 @@ describe( 'Unique Selector Tests', () =>
         
         expect( uniqueSelector ).to.equal( '[data-cy="my-button"]' );
       });
+
+      it('should support per-attribute type configuration', () => {
+        $( 'body' ).append(`
+          <div data-cy="1">
+            <div data-cy="2" data-foo="outer">
+              <div data-cy="3" data-foo="inner">
+                <button id="btn">Test</button>
+              </div>
+            </div>
+          </div>
+        `);
+        
+        const button = $( '#btn' ).get( 0 );
+        const uniqueSelector = unique( button, {
+          significantAncestors: {
+            attributes: [
+              { attribute: 'data-cy', value: '*', type: 'all' },
+              { attribute: 'data-foo', value: '*', type: 'closest' }
+            ]
+          }
+        });
+        
+        // data-cy uses 'all' - include all 3 ancestors (1, 2, 3)
+        // data-foo uses 'closest' - include only nearest (inner on element with data-cy="3")
+        // Result: element with data-cy="2" has data-foo="outer" but it's NOT the closest, so omit it
+        expect( uniqueSelector ).to.equal( '[data-cy="1"] [data-cy="2"] [data-cy="3"][data-foo="inner"] #btn' );
+      });
     });
 
     describe('caching', () => {
@@ -792,6 +818,54 @@ describe( 'Unique Selector Tests', () =>
         
         // Cache should not have grown (all data was already cached)
         expect( cache.size ).to.equal( cacheSize );
+      });
+
+      it('should cache elements without significant attributes for faster sibling lookups', () => {
+        $( 'body' ).append(`
+          <div data-cy="container">
+            <div class="wrapper">
+              <button id="btn1">Button 1</button>
+              <button id="btn2">Button 2</button>
+            </div>
+          </div>
+        `);
+        
+        const cache = new Map();
+        const button1 = $( '#btn1' ).get( 0 );
+        const button2 = $( '#btn2' ).get( 0 );
+        const wrapper = button1.parentElement;
+        
+        // First call on btn1 - will cache btn1, wrapper, and container
+        const selector1 = unique( button1, {
+          significantAncestors: {
+            attributes: [{ attribute: 'data-cy', value: '*' }],
+            type: 'all'
+          },
+          significantAttributesCache: cache
+        });
+        expect( selector1 ).to.equal( '[data-cy="container"] #btn1' );
+        
+        // wrapper should be in cache even though it has no significant attributes
+        expect( cache.has(wrapper) ).to.equal( true );
+        const wrapperData = cache.get(wrapper);
+        expect( Object.keys(wrapperData.matchedAttributes).length ).to.equal( 0 ); // No significant attrs
+        expect( wrapperData.significantParents.length ).to.be.greaterThan( 0 ); // But knows about container!
+        
+        const cacheSize = cache.size;
+        
+        // Second call on btn2 (sibling of btn1)
+        // Should hit cache on wrapper, avoiding full traversal
+        const selector2 = unique( button2, {
+          significantAncestors: {
+            attributes: [{ attribute: 'data-cy', value: '*' }],
+            type: 'all'
+          },
+          significantAttributesCache: cache
+        });
+        expect( selector2 ).to.equal( '[data-cy="container"] #btn2' );
+        
+        // Cache should have grown by only 1 (btn2), wrapper and container already cached
+        expect( cache.size ).to.equal( cacheSize + 1 );
       });
     });
 
@@ -879,6 +953,47 @@ describe( 'Unique Selector Tests', () =>
         // Verify no duplicates in the selector
         const matches = uniqueSelector.match(/\[data-test="btn"\]/g);
         expect( matches.length ).to.equal( 1 );
+      });
+
+      it('should maintain correct CSS selector order when combining with pseudo-selectors', () => {
+        $( 'body' ).append(`
+          <div data-cy="container">
+            <div data-cy="wrapper">
+              <span data-cy="btn">Span 1</span>
+              <span data-cy="btn">Span 2</span>
+            </div>
+            <div data-cy="wrapper">
+              <span data-cy="btn">Span 3</span>
+            </div>
+          </div>
+        `);
+        
+        const span1 = $( 'span' ).get( 0 );
+        const uniqueSelector = unique( span1, {
+          selectorTypes: ['tag', 'nth-child'],  // Don't include data-cy in selectorTypes
+          significantAncestors: {
+            attributes: [{ attribute: 'data-cy', value: '*' }],
+            type: 'all'
+          }
+        });
+        
+        // [data-cy="wrapper"] [data-cy="btn"] is not unique (multiple match)
+        // Needs tag and/or nth-child to disambiguate
+        // Correct order: tag[attributes]:pseudo
+        // Should be something like: span[data-cy="btn"]:nth-child(1) or [data-cy="wrapper"]:nth-child(1) > span[data-cy="btn"]
+        
+        // The key test: if attributes and pseudo-selectors are combined, attributes must come before pseudo
+        // Regex checks that we don't have patterns like ]:nth-child(1)span or similar
+        const hasAttributeBeforePseudo = /\[data-cy="[^"]+"\]:nth-child/.test(uniqueSelector);
+        const hasInvalidOrdering = /:nth-child\(\d+\)\[data-cy/.test(uniqueSelector) || /:nth-child\(\d+\)span/.test(uniqueSelector);
+        
+        expect( hasInvalidOrdering ).to.equal( false, 'Selector has invalid CSS ordering' );
+        
+        // Verify selector is valid and unique
+        const root = span1.getRootNode();
+        const matches = root.querySelectorAll(uniqueSelector);
+        expect( matches.length ).to.equal( 1 );
+        expect( matches[0] ).to.equal( span1 );
       });
 
       it('should avoid redundancy when combining significant attributes with regular selector', () => {
