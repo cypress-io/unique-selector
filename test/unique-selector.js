@@ -493,4 +493,431 @@ describe( 'Unique Selector Tests', () =>
     const uniqueSelector = unique( el );
     expect( uniqueSelector ).to.equal( null );
   })
+
+  describe('requiredAttributes', () => {
+    it('appends required attribute to unique element selector', () => {
+      $( 'body' ).append( '<div class="foo" data-test="Foo"></div>' );
+      const el = $( '.foo' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-test', value: '.*' }]
+      });
+      expect( result ).to.equal( '.foo[data-test="Foo"]' );
+    });
+
+    it('includes ancestors with matching required attributes', () => {
+      $( 'body' ).append(
+        '<div data-foo="foo-1"><div data-foo="foo-2"><button id="my-button"></button></div></div>'
+      );
+      const el = $( '#my-button' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-foo', value: '.*' }]
+      });
+      expect( result ).to.equal( '[data-foo="foo-1"] [data-foo="foo-2"] #my-button' );
+    });
+
+    it('includes both target and ancestor required attributes', () => {
+      $( 'body' ).append(
+        '<div data-foo="val"><button data-test="btn"></button></div>'
+      );
+      const el = $( 'button' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [
+          { attributeName: 'data-foo', value: '.*' },
+          { attributeName: 'data-test', value: '.*' }
+        ]
+      });
+      expect( result ).to.equal( '[data-foo="val"] button[data-test="btn"]' );
+    });
+
+    it('returns normal selector when no elements match', () => {
+      $( 'body' ).append( '<div class="bar"></div>' );
+      const el = $( '.bar' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-test', value: '.*' }]
+      });
+      expect( result ).to.equal( '.bar' );
+    });
+
+    it('applies regex filtering on attribute values', () => {
+      $( 'body' ).append(
+        '<div data-foo="foo-1"><div data-foo="bar-2"><button id="btn"></button></div></div>'
+      );
+      const el = $( '#btn' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-foo', value: '^foo' }]
+      });
+      // Only data-foo="foo-1" matches the ^foo regex, not data-foo="bar-2"
+      expect( result ).to.equal( '[data-foo="foo-1"] #btn' );
+    });
+
+    it('matches multiple requiredAttributes entries', () => {
+      $( 'body' ).append(
+        '<div data-section="header"><div data-test="nav"><span id="item"></span></div></div>'
+      );
+      const el = $( '#item' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [
+          { attributeName: 'data-section', value: '.*' },
+          { attributeName: 'data-test', value: '.*' }
+        ]
+      });
+      expect( result ).to.equal( '[data-section="header"] [data-test="nav"] #item' );
+    });
+
+    it('behaves normally with empty requiredAttributes array', () => {
+      $( 'body' ).append( '<div class="baz"></div>' );
+      const el = $( '.baz' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: []
+      });
+      expect( result ).to.equal( '.baz' );
+    });
+
+    it('skips intermediate non-matching elements', () => {
+      $( 'body' ).append(
+        '<div data-foo="outer"><div class="middle"><div data-foo="inner"><button id="target"></button></div></div></div>'
+      );
+      const el = $( '#target' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-foo', value: '.*' }]
+      });
+      // .middle div should be skipped, using descendant selectors
+      expect( result ).to.equal( '[data-foo="outer"] [data-foo="inner"] #target' );
+    });
+
+    it('inserts required attribute before nth-child in base selector', () => {
+      $( 'body' ).append(
+        '<div><span data-test="a"></span><span data-test="b"></span></div>'
+      );
+      const el = $( 'span' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-test', value: '.*' }]
+      });
+      expect( result ).to.equal( '[data-test="a"]:nth-child(1)' );
+    });
+
+    it('decorates required attrs into base selector with child combinators', () => {
+      // Two parallel trees so that .inner and button aren't globally unique
+      $( 'body' ).append(
+        '<div data-test="app">' +
+          '<div class="outer">' +
+            '<div class="inner" data-test="inner-comp">' +
+              '<button>A</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="outer">' +
+            '<div class="inner">' +
+              '<button>B</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+      const el = $( 'body' ).find( 'button' ).get( 0 );
+
+      // Without requiredAttributes, verify the base selector uses > combinators
+      const baseResult = unique( el );
+      expect( baseResult ).to.equal( ':nth-child(1) > .inner > button' );
+
+      // With requiredAttributes, data-test should be woven into the > chain
+      // .inner has data-test="inner-comp" and is IN the > chain — attr should be
+      // appended to its segment, not prepended as a separate ancestor.
+      // data-test="app" is ABOVE the chain — prepended with descendant combinator.
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-test', value: '.*' }]
+      });
+      expect( result ).to.equal( '[data-test="app"] .inner[data-test="inner-comp"] > button' );
+    });
+
+    it('handles required attrs on multiple elements within the > chain', () => {
+      $( 'body' ).append(
+        '<div data-test="root">' +
+          '<div class="a" data-test="section-a">' +
+            '<div class="b" data-test="panel">' +
+              '<span>X</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="a" data-test="section-b">' +
+            '<div class="b">' +
+              '<span>Y</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+      const el = $( 'body' ).find( 'span' ).get( 0 );
+
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-test', value: '.*' }]
+      });
+      // data-test="root" is above the chain, data-test="section-a" and
+      // data-test="panel" are elements in the > chain
+      expect( result ).to.equal( '[data-test="root"] [data-test="section-a"] .b[data-test="panel"] > span' );
+    });
+
+    it('uses cache for sibling elements', () => {
+      $( 'body' ).append(
+        '<div data-foo="parent"><span id="a"></span><span id="b"></span></div>'
+      );
+      const cache = new Map();
+      const elA = $( '#a' ).get( 0 );
+      const elB = $( '#b' ).get( 0 );
+      const opts = {
+        requiredAttributes: [{ attributeName: 'data-foo', value: '.*' }],
+        requiredAttributesCache: cache,
+      };
+
+      const resultA = unique( elA, opts );
+      expect( resultA ).to.equal( '[data-foo="parent"] #a' );
+      // Cache should have entries after first call
+      expect( cache.size ).to.be.greaterThan( 0 );
+
+      const resultB = unique( elB, opts );
+      expect( resultB ).to.equal( '[data-foo="parent"] #b' );
+    });
+
+    it('deep nesting (8 levels) with required attrs at levels 1, 3, 6', () => {
+      // Duplicate nav-items force a > chain for uniqueness.
+      // Required attrs at depth 1 (app), 3 (sidebar), 6 (nav-section).
+      $( 'body' ).append(
+        '<div data-cy="app" class="root">' +
+          '<main class="layout">' +
+            '<div data-cy="sidebar" class="panel">' +
+              '<ul class="nav">' +
+                '<li class="nav-item">' +
+                  '<div data-cy="nav-section" class="section">' +
+                    '<div class="item-wrapper">' +
+                      '<a class="link">Link A</a>' +
+                    '</div>' +
+                  '</div>' +
+                '</li>' +
+                '<li class="nav-item">' +
+                  '<div class="section">' +
+                    '<div class="item-wrapper">' +
+                      '<a class="link">Link B</a>' +
+                    '</div>' +
+                  '</div>' +
+                '</li>' +
+              '</ul>' +
+            '</div>' +
+          '</main>' +
+        '</div>'
+      );
+      const el = $( 'body' ).find( 'a.link' ).get( 0 );
+
+      // Base uses nth-child to disambiguate the two nav-items
+      expect( unique( el ) ).to.equal(
+        ':nth-child(1) > .section > .item-wrapper > .link'
+      );
+
+      // data-cy="nav-section" woven into the .section segment of the > chain,
+      // data-cy="app" and data-cy="sidebar" above the chain as ancestors
+      expect( unique( el, {
+        requiredAttributes: [{ attributeName: 'data-cy', value: '.*' }]
+      })).to.equal(
+        '[data-cy="app"] [data-cy="sidebar"] .section[data-cy="nav-section"] > .item-wrapper > .link'
+      );
+    });
+
+    it('sibling subtrees with target having a required attr and duplicates', () => {
+      // Two card subtrees with duplicate structure. Target button has data-test.
+      // Sibling button in same card + button in duplicate card.
+      $( 'body' ).append(
+        '<div id="app">' +
+          '<div data-test="header" class="region">' +
+            '<nav class="nav"><a class="logo">Logo</a></nav>' +
+          '</div>' +
+          '<div data-test="content" class="region">' +
+            '<div class="container">' +
+              '<div data-test="card" class="card">' +
+                '<div class="card-body">' +
+                  '<div class="row">' +
+                    '<div class="col"><button class="btn" data-test="submit">Go</button></div>' +
+                    '<div class="col"><button class="btn">Cancel</button></div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div data-test="card" class="card">' +
+                '<div class="card-body">' +
+                  '<div class="row">' +
+                    '<div class="col"><button class="btn" data-test="reset">Reset</button></div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+      const el = $( 'button[data-test="submit"]' ).get( 0 );
+
+      // Base needs a long > chain to disambiguate through duplicate cards and cols
+      expect( unique( el ) ).to.equal(
+        ':nth-child(1) > .card-body > .row > :nth-child(1) > .btn'
+      );
+
+      // data-test="submit" on target makes it unique early,
+      // data-test="content" and data-test="card" above as ancestors
+      expect( unique( el, {
+        requiredAttributes: [{ attributeName: 'data-test', value: '.*' }]
+      })).to.equal(
+        '[data-test="content"] [data-test="card"] .btn[data-test="submit"]'
+      );
+    });
+
+    it('regex filters out non-matching required attrs at various depths', () => {
+      // data-test values at multiple levels; regex ^page- excludes "internal-layout"
+      $( 'body' ).append(
+        '<div data-test="page-home" class="page">' +
+          '<div data-test="internal-layout" class="layout">' +
+            '<div class="sidebar">' +
+              '<div data-test="page-nav" class="widget">' +
+                '<div class="widget-body">' +
+                  '<ul class="list">' +
+                    '<li class="list-item">' +
+                      '<a class="action" data-test="page-link-1">L1</a>' +
+                    '</li>' +
+                    '<li class="list-item">' +
+                      '<a class="action" data-test="page-link-2">L2</a>' +
+                    '</li>' +
+                  '</ul>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+      const el = $( 'a[data-test="page-link-1"]' ).get( 0 );
+
+      expect( unique( el ) ).to.equal( ':nth-child(1) > .action' );
+
+      // "internal-layout" does NOT match ^page-, so it's excluded
+      expect( unique( el, {
+        requiredAttributes: [{ attributeName: 'data-test', value: '^page-' }]
+      })).to.equal(
+        '[data-test="page-home"] [data-test="page-nav"] .action[data-test="page-link-1"]'
+      );
+    });
+
+    it('two requiredAttributes (data-cy + data-region) across 8 levels', () => {
+      // Required attrs from two different attribute names interleaved at different levels.
+      // Duplicate panes force > chain.
+      $( 'body' ).append(
+        '<div data-region="main" class="app">' +
+          '<div data-cy="dashboard">' +
+            '<div class="grid">' +
+              '<div data-region="left" class="pane">' +
+                '<div data-cy="widget-a" class="widget">' +
+                  '<div class="widget-content">' +
+                    '<div class="inner">' +
+                      '<span class="value">42</span>' +
+                    '</div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div data-region="right" class="pane">' +
+                '<div class="widget">' +
+                  '<div class="widget-content">' +
+                    '<div class="inner">' +
+                      '<span class="value">99</span>' +
+                    '</div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+      const el = $( 'span.value' ).get( 0 );
+
+      expect( unique( el ) ).to.equal(
+        ':nth-child(1) > .widget > .widget-content > .inner > .value'
+      );
+
+      // data-cy="widget-a" woven into the .widget segment in the > chain,
+      // data-region="main", data-cy="dashboard", data-region="left" above chain
+      expect( unique( el, {
+        requiredAttributes: [
+          { attributeName: 'data-cy', value: '.*' },
+          { attributeName: 'data-region', value: '.*' }
+        ]
+      })).to.equal(
+        '[data-region="main"] [data-cy="dashboard"] [data-region="left"] .widget[data-cy="widget-a"] > .widget-content > .inner > .value'
+      );
+    });
+
+    it('ID at intermediate level cuts chain short, required attrs above and below', () => {
+      // #main-content makes the chain unique early.
+      // Required attrs exist both above the ID (data-test="app") and below it (data-test="form", "email").
+      $( 'body' ).append(
+        '<div data-test="app">' +
+          '<div class="wrapper">' +
+            '<div id="main-content">' +
+              '<div data-test="form" class="form">' +
+                '<div class="form-group">' +
+                  '<div class="input-row">' +
+                    '<div class="field">' +
+                      '<input type="text" data-test="email" class="input" />' +
+                    '</div>' +
+                    '<div class="field">' +
+                      '<input type="text" class="input" />' +
+                    '</div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+      const el = $( 'input[data-test="email"]' ).get( 0 );
+
+      // ID makes uniqueness easy — short base chain
+      expect( unique( el ) ).to.equal( ':nth-child(1) > .input' );
+
+      // data-test="email" on target, data-test="form" and data-test="app" as ancestors
+      expect( unique( el, {
+        requiredAttributes: [{ attributeName: 'data-test', value: '.*' }]
+      })).to.equal(
+        '[data-test="app"] [data-test="form"] .input[data-test="email"]'
+      );
+    });
+
+    it('does not duplicate attribute already present via selectorTypes', () => {
+      $( 'body' ).append(
+        '<div data-case="supplemental_identifier_to_deconflict">' +
+          '<form id="autogen_wrapper" data-cy="autogen_shippingAddress">' +
+            '<h4 id="autogen_formTitle">Shipping Address</h4>' +
+            '<label>First Name <input id="autogen_firstName"></label>' +
+            '<label>Last Name <input id="autogen_lastName"></label>' +
+          '</form>' +
+          '<label>Address' +
+            '<div id="mui_wrapper" class="MuiFormControl-root" data-cy="mui-shipping">' +
+              '<textarea id="autogen_address"></textarea>' +
+            '</div>' +
+          '</label>' +
+          '<div class="v-application"><div>' +
+            '<div id="vuetify_wrapper" class="v-input" data-qa="vuetify-shipping">' +
+              '<label>Phone Number <input id="autogen_phone"></label>' +
+            '</div>' +
+          '</div></div>' +
+        '</div>'
+      );
+
+      const el = $( '#autogen_firstName' ).get( 0 );
+      const result = unique( el, {
+        selectorTypes: ['data-cy', 'id', 'class', 'tag', 'nth-child'],
+        requiredAttributes: [{ attributeName: 'data-cy', value: '.*' }]
+      });
+      expect( result ).to.equal( '[data-cy="autogen_shippingAddress"] #autogen_firstName' );
+    });
+
+    it('does not false-match attribute name inside another attribute value', () => {
+      $( 'body' ).append(
+        '<div data-foo="data-cy-blargh" data-cy="real"><span id="falseMatchTarget"></span></div>'
+      );
+      const el = $( '#falseMatchTarget' ).get( 0 );
+      const result = unique( el, {
+        selectorTypes: ['data-foo', 'id', 'class', 'tag', 'nth-child'],
+        requiredAttributes: [{ attributeName: 'data-cy', value: '.*' }]
+      });
+      expect( result ).to.equal( '[data-cy="real"] #falseMatchTarget' );
+    });
+  })
 } );

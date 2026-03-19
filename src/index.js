@@ -18,6 +18,152 @@ const dataRegex = /^data-.+/;
 const attrRegex = /^attribute:(.+)/m;
 
 /**
+ * Checks if an element has any attributes matching the requiredAttributes config.
+ * @param { Element } el
+ * @param { Array<{attributeName: string, value: string}> } requiredAttributes
+ * @return { String | null } - Combined attribute selector string, or null if no match
+ */
+function getRequiredAttributeSelector(el, requiredAttributes) {
+  const matchingSelectors = [];
+  for (const { attributeName, value } of requiredAttributes) {
+    const attrValue = el.getAttribute(attributeName);
+    if (attrValue === null) continue;
+    const regex = new RegExp(value);
+    if (regex.test(attrValue)) {
+      matchingSelectors.push(
+        attrValue ? `[${attributeName}="${attrValue}"]` : `[${attributeName}]`
+      );
+    }
+  }
+  return matchingSelectors.length > 0 ? matchingSelectors.join('') : null;
+}
+
+/**
+ * Returns the cached required attribute selector for an element, or computes and caches it.
+ * @param { Element } el
+ * @param { Array<{attributeName: string, value: string}> } requiredAttributes
+ * @param { Map | undefined } cache
+ * @return { String | null }
+ */
+function getCachedRequiredAttr(el, requiredAttributes, cache) {
+  if (cache && cache.has(el)) return cache.get(el);
+  const selector = getRequiredAttributeSelector(el, requiredAttributes);
+  if (cache) cache.set(el, selector);
+  return selector;
+}
+
+/**
+ * Inserts a required attribute selector into an element selector, placing it before any :nth-child.
+ * @param { String } selector - A single element's selector (no combinators)
+ * @param { String } attrSelector
+ * @return { String }
+ */
+function insertRequiredAttrIntoSelector(selector, attrSelector) {
+  // Extract the attribute name from attrSelector (e.g. "data-cy" from '[data-cy="val"]')
+  const attrName = attrSelector.slice(1, attrSelector.indexOf(']')).split('=')[0];
+  // Check if the selector already contains an attribute selector for this name,
+  // matching a literal "[attrName=" or "[attrName]" — not inside a quoted value.
+  const attrPattern = new RegExp('\\[' + attrName.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&') + '[=\\]]');
+  if (attrPattern.test(selector)) {
+    return selector;
+  }
+  const nthChildIndex = selector.indexOf(':nth-child');
+  if (nthChildIndex !== -1) {
+    const before = selector.slice(0, nthChildIndex);
+    const nthPart = selector.slice(nthChildIndex);
+    return before + attrSelector + nthPart;
+  }
+  return selector + attrSelector;
+}
+
+/**
+ * Builds a selector that includes all required attribute matches from the element and its ancestors.
+ * Replicates the unique() walk but weaves required attributes into each element's selector
+ * as the chain is built, ensuring attrs on elements within the > chain are appended to their
+ * segment rather than prepended as separate ancestors.
+ * @param { Element } el
+ * @param { Object } options - The full options object passed to unique()
+ * @return { String | null }
+ */
+function buildRequiredAttributesSelector(el, options) {
+  const {
+    selectorTypes: sTypes = ['id', 'name', 'class', 'tag', 'nth-child'],
+    attributesToIgnore: aToIgnore = ['id', 'class', 'length'],
+    filter,
+    selectorCache,
+    isUniqueCache,
+    requiredAttributes,
+    requiredAttributesCache,
+  } = options;
+
+  const normalizedFilter = filter && function(type, key, value) {
+    const result = filter(type, key, value);
+    if (result === null || result === undefined) return true;
+    return result;
+  };
+
+  // Walk up from el building the selector chain (like unique() does)
+  // but append required attributes to each element's selector inline.
+  const allSelectors = [];
+  const chainElements = [];
+  let currentElement = el;
+
+  while (currentElement) {
+    let selector = selectorCache ? selectorCache.get(currentElement) : undefined;
+
+    if (!selector) {
+      selector = getUniqueSelector(currentElement, sTypes, aToIgnore, normalizedFilter);
+      if (selectorCache) selectorCache.set(currentElement, selector);
+    }
+
+    // Weave required attribute into this element's selector
+    const reqAttr = getCachedRequiredAttr(currentElement, requiredAttributes, requiredAttributesCache);
+    const decoratedSelector = reqAttr
+      ? insertRequiredAttrIntoSelector(selector, reqAttr)
+      : selector;
+
+    allSelectors.unshift(decoratedSelector);
+    chainElements.unshift(currentElement);
+
+    var maybeUniqueSelector = allSelectors.join(' > ');
+    var isUniqueResult = isUniqueCache ? isUniqueCache.get(maybeUniqueSelector) : undefined;
+    if (isUniqueResult === undefined) {
+      isUniqueResult = isUnique(el, maybeUniqueSelector);
+      if (isUniqueCache) isUniqueCache.set(maybeUniqueSelector, isUniqueResult);
+
+      if (!isUniqueResult && el.parentNode && isShadowRoot(el.parentNode)) {
+        maybeUniqueSelector = ':host > ' + maybeUniqueSelector;
+        isUniqueResult = isUnique(el, maybeUniqueSelector);
+        if (isUniqueCache) isUniqueCache.set(maybeUniqueSelector, isUniqueResult);
+      }
+    }
+
+    if (isUniqueResult) {
+      // Found a unique chain. Now collect any ancestors ABOVE the chain
+      // that have matching required attributes, prepend with descendant combinators.
+      var ancestorSelectors = [];
+      var ancestor = currentElement.parentElement;
+      while (ancestor) {
+        var ancestorReqAttr = getCachedRequiredAttr(ancestor, requiredAttributes, requiredAttributesCache);
+        if (ancestorReqAttr) {
+          ancestorSelectors.unshift(ancestorReqAttr);
+        }
+        ancestor = ancestor.parentElement;
+      }
+
+      if (ancestorSelectors.length > 0) {
+        return ancestorSelectors.join(' ') + ' ' + maybeUniqueSelector;
+      }
+      return maybeUniqueSelector;
+    }
+
+    currentElement = currentElement.parentElement;
+  }
+
+  return null;
+}
+
+/**
  * @typedef Filter
  * @type {Function}
  * @param {string} type - the trait being considered ('attribute', 'tag', 'nth-child'). As a special case, the `class` attribute is split on whitespace and each token passed individually with a `class` type.
@@ -204,13 +350,19 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore, filter )
  * @api private
  */
 export default function unique( el, options={} ) {
-  const { 
-    selectorTypes=['id', 'name', 'class', 'tag', 'nth-child'], 
+  const {
+    selectorTypes=['id', 'name', 'class', 'tag', 'nth-child'],
     attributesToIgnore= ['id', 'class', 'length'],
     filter,
     selectorCache,
-    isUniqueCache
+    isUniqueCache,
+    requiredAttributes,
+    requiredAttributesCache,
   } = options;
+
+  if (requiredAttributes && requiredAttributes.length > 0) {
+    return buildRequiredAttributesSelector(el, options);
+  }
   // If filter was provided wrap it to ensure a default value of `true` is returned if the provided function fails to return a value
   const normalizedFilter = filter && function(type, key, value) {
     const result = filter(type, key, value)
