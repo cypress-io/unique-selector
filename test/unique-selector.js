@@ -879,7 +879,9 @@ describe( 'Unique Selector Tests', () =>
       );
     });
 
-    it('does not duplicate attribute already present via selectorTypes', () => {
+    it('deduplicates when same attribute is in both selectorTypes and requiredAttributes', () => {
+      // When selectorTypes includes data-cy, the base selector already contains
+      // [data-cy="..."]. requiredAttributes should not append it again.
       $( 'body' ).append(
         '<div data-case="supplemental_identifier_to_deconflict">' +
           '<form id="autogen_wrapper" data-cy="autogen_shippingAddress">' +
@@ -908,7 +910,9 @@ describe( 'Unique Selector Tests', () =>
       expect( result ).to.equal( '[data-cy="autogen_shippingAddress"] #autogen_firstName' );
     });
 
-    it('does not false-match attribute name inside another attribute value', () => {
+    it('dedup check does not false-match attribute name inside another attribute value', () => {
+      // data-foo's value contains "data-cy" as a substring — the dedup check
+      // should only match actual [data-cy=...] attribute selectors, not values.
       $( 'body' ).append(
         '<div data-foo="data-cy-blargh" data-cy="real"><span id="falseMatchTarget"></span></div>'
       );
@@ -918,6 +922,92 @@ describe( 'Unique Selector Tests', () =>
         requiredAttributes: [{ attributeName: 'data-cy', value: '.*' }]
       });
       expect( result ).to.equal( '[data-cy="real"] #falseMatchTarget' );
+    });
+
+    it('merges required attr with ID base selector', () => {
+      $( 'body' ).append(
+        '<div><span id="idTarget" data-cy="hero"></span><span></span></div>'
+      );
+      const el = $( '#idTarget' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-cy', value: '.*' }]
+      });
+      expect( result ).to.equal( '#idTarget[data-cy="hero"]' );
+    });
+
+    it('merges required attr with name base selector', () => {
+      $( 'body' ).append(
+        '<div><input name="email" data-cy="emailField"></div>'
+      );
+      const el = $( '[name="email"]' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-cy', value: '.*' }]
+      });
+      expect( result ).to.equal( '[name="email"][data-cy="emailField"]' );
+    });
+
+    it('merges required attr with multi-class base selector', () => {
+      // Two elements share .foo, but only one has .bar — combo .foo.bar is unique
+      $( 'body' ).append(
+        '<div><span class="foo bar" data-cy="combo"></span><span class="foo"></span></div>'
+      );
+      const el = $( '.foo.bar' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-cy', value: '.*' }]
+      });
+      expect( result ).to.equal( '.bar[data-cy="combo"]' );
+    });
+
+    it('merges required attr with tag+class combo base selector', () => {
+      // Two .item elements (span and div) — tag+class combo div.item is unique
+      $( 'body' ).append(
+        '<div><div class="item" data-cy="divItem">A</div><span class="item">B</span></div>'
+      );
+      const el = $( 'div.item' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-cy', value: '.*' }]
+      });
+      expect( result ).to.equal( 'div.item[data-cy="divItem"]' );
+    });
+
+    it('merges required attr with tag:nth-child base selector', () => {
+      // Two spans, neither has a unique class/id — falls through to nth-child
+      $( 'body' ).append(
+        '<div><span data-cy="first">A</span><span>B</span></div>'
+      );
+      const el = $( 'body' ).find( 'span' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-cy', value: '.*' }]
+      });
+      expect( result ).to.equal( '[data-cy="first"]:nth-child(1)' );
+    });
+
+    it('merges multiple required attrs into a single element selector', () => {
+      // Both data-cy and data-test should be woven into the same element's selector
+      $( 'body' ).append(
+        '<div><button class="btn" data-cy="submit" data-test="primary">Go</button><button class="btn">Cancel</button></div>'
+      );
+      const el = $( 'body' ).find( 'button' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [
+          { attributeName: 'data-cy', value: '.*' },
+          { attributeName: 'data-test', value: '.*' }
+        ]
+      });
+      expect( result ).to.equal( '[data-cy="submit"][data-test="primary"]:nth-child(1)' );
+    });
+
+    it('merges required attr with nth-child fallback base selector', () => {
+      // Custom elements with no id/class/name — falls through to nth-child
+      $( 'body' ).append(
+        '<div><my-component data-cy="widget"></my-component><my-component></my-component></div>'
+      );
+      const el = $( 'body' ).find( 'my-component' ).get( 0 );
+      const result = unique( el, {
+        selectorTypes: ['id', 'class', 'tag', 'nth-child'],
+        requiredAttributes: [{ attributeName: 'data-cy', value: '.*' }]
+      });
+      expect( result ).to.equal( '[data-cy="widget"]:nth-child(1)' );
     });
   })
 } );
