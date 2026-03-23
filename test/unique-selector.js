@@ -550,6 +550,29 @@ describe( 'Unique Selector Tests', () =>
       expect( result ).to.equal( '[data-foo="foo-1"] #btn' );
     });
 
+    it('empty value matches any attribute value (treated as match-all)', () => {
+      $( 'body' ).append(
+        '<div data-cy="alpha"><button id="btn-empty-value"></button></div>'
+      );
+      const el = $( '#btn-empty-value' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-cy', value: '' }]
+      });
+      expect( result ).to.equal( '[data-cy="alpha"] #btn-empty-value' );
+    });
+
+    it('value ".*" matches any attribute value without running a regex', () => {
+      // Both ancestors carry the attribute with distinct values — both must appear in the selector.
+      $( 'body' ).append(
+        '<div data-cy="alpha"><div data-cy="beta"><button id="btn-wildcard"></button></div></div>'
+      );
+      const el = $( '#btn-wildcard' ).get( 0 );
+      const result = unique( el, {
+        requiredAttributes: [{ attributeName: 'data-cy', value: '.*' }]
+      });
+      expect( result ).to.equal( '[data-cy="alpha"] [data-cy="beta"] #btn-wildcard' );
+    });
+
     it('matches multiple requiredAttributes entries', () => {
       $( 'body' ).append(
         '<div data-section="header"><div data-test="nav"><span id="item"></span></div></div>'

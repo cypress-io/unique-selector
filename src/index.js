@@ -20,7 +20,7 @@ const attrRegex = /^attribute:(.+)/m;
 /**
  * @typedef CompiledRequiredAttr
  * @property { string } attributeName - The DOM attribute name (e.g. 'data-cy')
- * @property { RegExp } regex - Precompiled pattern to test attribute values against
+ * @property { RegExp | null } regex - Precompiled pattern to test attribute values against; null means match any value
  * @property { RegExp } dedupPattern - Matches `[attrName=` or `[attrName]` in a selector string to detect existing usage
  * @property { RegExp } stripPattern - Matches a full `[attrName="..."]` or `[attrName]` bracket for removal during dedup
  */
@@ -37,7 +37,7 @@ function getRequiredAttributeSelector(el, compiledAttrs) {
   for (const { attributeName, regex } of compiledAttrs) {
     const attrValue = el.getAttribute(attributeName);
     if (attrValue === null) continue;
-    if (regex.test(attrValue)) {
+    if (regex === null || regex.test(attrValue)) {
       matchingSelectors.push(
         attrValue ? `[${attributeName}="${attrValue}"]` : `[${attributeName}]`
       );
@@ -294,7 +294,7 @@ export default function unique( el, options={} ) {
         const escaped = attributeName.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
         return {
           attributeName,
-          regex: new RegExp(value),
+          regex: (!value || value === '.*') ? null : new RegExp(value),
           dedupPattern: new RegExp('\\[' + escaped + '[=\\]]'),
           stripPattern: new RegExp('\\[' + escaped + '(?:="[^"]*")?\\]'),
         };
