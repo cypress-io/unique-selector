@@ -291,11 +291,14 @@ export default function unique( el, options={} ) {
   const hasRequiredAttrs = requiredAttributes && requiredAttributes.length > 0;
   const compiledRequiredAttrs = hasRequiredAttrs
     ? requiredAttributes.map(({ attributeName, value }) => {
+        // Escape regex metacharacters: - [ ] / { } ( ) * + ? . \ ^ $ |
         const escaped = attributeName.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
         return {
           attributeName,
           regex: (!value || value === '.*') ? null : new RegExp(value),
+          // Matches [attrName=  or [attrName]  — used to detect if the attribute is already present in a selector string.
           dedupPattern: new RegExp('\\[' + escaped + '[=\\]]'),
+          // Matches [attrName="any-value"] or [attrName] — used to strip an existing attribute bracket before re-appending it.
           stripPattern: new RegExp('\\[' + escaped + '(?:="[^"]*")?\\]'),
         };
       })
