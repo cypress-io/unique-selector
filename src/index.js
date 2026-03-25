@@ -20,28 +20,28 @@ const attrRegex = /^attribute:(.+)/m;
 /**
  * @typedef CompiledRequiredAttr
  * @property { string } attributeName - The DOM attribute name (e.g. 'data-cy')
- * @property { RegExp | null } regex - Precompiled pattern to test attribute values against; null means match any value
  * @property { RegExp } dedupPattern - Matches `[attrName=` or `[attrName]` in a selector string to detect existing usage
  * @property { RegExp } stripPattern - Matches a full `[attrName="..."]` or `[attrName]` bracket for removal during dedup
  */
 
 /**
  * Builds a combined attribute selector string for all required attributes present on an element.
- * For example, an element with data-cy="nav" and data-test="main" might produce '[data-cy="nav"][data-test="main"]'.
+ * An optional filter function (sourced independently from the main selector filter) controls which
+ * attribute values are allowed to be injected.
  * @param { Element } el
  * @param { CompiledRequiredAttr[] } compiledAttrs
+ * @param { Function | undefined } filter
  * @return { String | null }
  */
-function getRequiredAttributeSelector(el, compiledAttrs) {
+function getRequiredAttributeSelector(el, compiledAttrs, filter) {
   const matchingSelectors = [];
-  for (const { attributeName, regex } of compiledAttrs) {
+  for (const { attributeName } of compiledAttrs) {
     const attrValue = el.getAttribute(attributeName);
     if (attrValue === null) continue;
-    if (regex === null || regex.test(attrValue)) {
-      matchingSelectors.push(
-        attrValue ? `[${attributeName}="${attrValue}"]` : `[${attributeName}]`
-      );
-    }
+    if (filter && !filter('attribute', attributeName, attrValue)) continue;
+    matchingSelectors.push(
+      attrValue ? `[${attributeName}="${attrValue}"]` : `[${attributeName}]`
+    );
   }
   return matchingSelectors.length > 0 ? matchingSelectors.join('') : null;
 }
@@ -50,12 +50,13 @@ function getRequiredAttributeSelector(el, compiledAttrs) {
  * Returns the required attribute selector for an element, using the cache when available.
  * @param { Element } el
  * @param { CompiledRequiredAttr[] } compiledAttrs
+ * @param { Function | undefined } filter
  * @param { Map<Element, String|null> | undefined } cache
  * @return { String | null }
  */
-function getCachedRequiredAttr(el, compiledAttrs, cache) {
+function getCachedRequiredAttr(el, compiledAttrs, filter, cache) {
   if (cache && cache.has(el)) return cache.get(el);
-  const selector = getRequiredAttributeSelector(el, compiledAttrs);
+  const selector = getRequiredAttributeSelector(el, compiledAttrs, filter);
   if (cache) cache.set(el, selector);
   return selector;
 }
@@ -271,8 +272,7 @@ function getUniqueSelector( element, selectorTypes, attributesToIgnore, filter )
  * @param {Filter} options.filter Provide a filter function to conditionally reject various traits when building selectors.
  * @param {Map<Element, String>} options.selectorCache Cache for Element -> Selector mappings. Caller is responsible for invalidation.
  * @param {Map<String, Boolean>} options.isUniqueCache Cache for Selector -> isUnique mappings. Caller is responsible for invalidation.
- * @param {Array<{attributeName: string, value: string}>} options.requiredAttributes Attribute patterns that must appear in the generated selector. Each entry specifies an attribute name and a regex pattern to match its value. Matching attributes are woven into the selector chain and ancestor context.
- * @param {Map<Element, String|null>} options.requiredAttributesCache Cache for Element -> required attribute selector mappings. Caller is responsible for invalidation.
+ * @param {{ attributeNames: string[], filter?: Function, elementCache?: Map<Element, String|null> }} options.requiredAttributes Attributes that must appear in the generated selector. Specifies the attribute names to inject, an optional filter function to control which values are allowed, and an optional element cache. Matching attributes are woven into the selector chain and ancestor context.
  * @return {String}
  */
 export default function unique( el, options={} ) {
@@ -283,19 +283,23 @@ export default function unique( el, options={} ) {
     selectorCache,
     isUniqueCache,
     requiredAttributes,
-    requiredAttributesCache,
   } = options;
 
-  // Precompile requiredAttributes regex patterns once per call to avoid
-  // repeated RegExp construction during the element walk.
-  const hasRequiredAttrs = requiredAttributes && requiredAttributes.length > 0;
+  const {
+    attributeNames: requiredAttributeNames,
+    filter: reqFilter,
+    elementCache: reqCache,
+  } = requiredAttributes || {};
+
+  // Precompile required attribute patterns once per call to avoid repeated
+  // RegExp construction during the element walk.
+  const hasRequiredAttrs = requiredAttributeNames && requiredAttributeNames.length > 0;
   const compiledRequiredAttrs = hasRequiredAttrs
-    ? requiredAttributes.map(({ attributeName, value }) => {
+    ? requiredAttributeNames.map((attributeName) => {
         // Escape regex metacharacters: - [ ] / { } ( ) * + ? . \ ^ $ |
         const escaped = attributeName.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
         return {
           attributeName,
-          regex: (!value || value === '.*') ? null : new RegExp(value),
           // Matches [attrName=  or [attrName]  — used to detect if the attribute is already present in a selector string.
           dedupPattern: new RegExp('\\[' + escaped + '[=\\]]'),
           // Matches [attrName="any-value"] or [attrName] — used to strip an existing attribute bracket before re-appending it.
@@ -328,7 +332,7 @@ export default function unique( el, options={} ) {
 
       // Merge any matching required attributes into the element's selector
       if (hasRequiredAttrs) {
-        const reqAttr = getCachedRequiredAttr(currentElement, compiledRequiredAttrs, requiredAttributesCache);
+        const reqAttr = getCachedRequiredAttr(currentElement, compiledRequiredAttrs, reqFilter, reqCache);
         if (reqAttr) {
           selector = insertRequiredAttrIntoSelector(selector, reqAttr, compiledRequiredAttrs);
         }
@@ -369,7 +373,7 @@ export default function unique( el, options={} ) {
         const ancestorSelectors = [];
         let ancestor = currentElement.parentElement;
         while (ancestor) {
-          const ancestorReqAttr = getCachedRequiredAttr(ancestor, compiledRequiredAttrs, requiredAttributesCache);
+          const ancestorReqAttr = getCachedRequiredAttr(ancestor, compiledRequiredAttrs, reqFilter, reqCache);
           if (ancestorReqAttr) {
             ancestorSelectors.unshift(ancestorReqAttr);
           }

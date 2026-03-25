@@ -56,6 +56,32 @@ Generates a unique CSS selector for the given DOM element.
 
 - **`isUniqueCache`** (Map<String, Boolean>, optional) - Cache to improve performance of repeated uniqueness checks. The caller is responsible for cache invalidation.
 
+- **`requiredAttributes`** (Object, optional) - Specifies attributes that must appear in the generated selector regardless of whether they are needed for uniqueness. When provided, matching attribute selectors are woven into every element's segment of the `>` chain, and ancestors above the unique chain are prepended using descendant combinators.
+
+  This option takes precedence over `selectorTypes` and `filter` for the attributes it names — if an element has a required attribute, its `[attr="value"]` selector will appear in the output even if `filter` would reject that attribute for uniqueness purposes, and even if the attribute is not listed in `selectorTypes`.
+
+  The `requiredAttributes` object has the following shape:
+
+  - **`attributeNames`** (String[]) - The attribute names to inject into the selector (e.g., `['data-component', 'data-cy']`). Exact attribute names only — not patterns or regexes.
+  - **`filter`** (Function, optional) - A filter function with the same signature as the top-level `filter` option, applied independently to control which attribute _values_ are allowed to be injected. Return `false` to skip injection for a given element. This filter is separate from the top-level `filter` and serves a different purpose: the top-level `filter` controls which traits are eligible for building a _unique_ selector, while `requiredAttributes.filter` controls which attribute values are eligible for _injection_.
+  - **`elementCache`** (Map<Element, String|null>, optional) - Cache for per-element required attribute selectors. The caller is responsible for cache invalidation.
+
+  ```javascript
+  unique(element, {
+    requiredAttributes: {
+      attributeNames: ['data-component', 'data-cy'],
+      filter: (type, key, value) => {
+        // Exclude auto-generated component names from injection
+        if (type === 'attribute' && key === 'data-component') {
+          return !value.startsWith('jss-');
+        }
+        return true;
+      },
+      elementCache: new Map(),
+    }
+  });
+  ```
+
 #### Returns
 
 - **String** - A unique CSS selector for the element, or `null` if no unique selector can be generated
@@ -118,6 +144,68 @@ const selector = unique(element, {
 });
 ```
 
+### Required Attributes
+
+Use `requiredAttributes` when you want specific attributes to always appear in the generated selector, regardless of whether they contribute to uniqueness. This is useful when your application uses semantic component attributes (e.g., `data-component`, `data-cy`) that you want reflected in every selector for readability or stability.
+
+```javascript
+// Always include data-component in the selector, even when an ID alone would be unique
+const selector = unique(element, {
+    requiredAttributes: {
+        attributeNames: ['data-component']
+    }
+});
+// '#submit-button' becomes '#submit-button[data-component="PrimaryButton"]'
+// Ancestors with data-component are prepended with descendant combinators:
+// '[data-component="Form"] #submit-button[data-component="PrimaryButton"]'
+```
+
+Required attributes take precedence over `selectorTypes` and `filter`. If an element has a required attribute, it will be injected into the selector even if:
+- The attribute is not listed in `selectorTypes`
+- The top-level `filter` would reject that attribute for uniqueness purposes
+
+```javascript
+// The top-level filter rejects data-component for uniqueness building,
+// but requiredAttributes.filter allows it to still be injected.
+const selector = unique(element, {
+    filter: (type, key) => key !== 'data-component',
+    requiredAttributes: {
+        attributeNames: ['data-component'],
+        // No requiredAttributes.filter — all values are injected
+    }
+});
+// data-component still appears in the output
+```
+
+Use `requiredAttributes.filter` independently to control which attribute _values_ get injected, without affecting how uniqueness is determined:
+
+```javascript
+// Inject data-component only when the value doesn't look auto-generated
+const selector = unique(element, {
+    requiredAttributes: {
+        attributeNames: ['data-component'],
+        filter: (type, key, value) => {
+            if (type === 'attribute' && key === 'data-component') {
+                return !value.startsWith('jss-');
+            }
+            return true;
+        },
+        elementCache: new Map(), // reuse across calls for performance
+    }
+});
+```
+
+When multiple `attributeNames` are specified, each is matched independently on every element:
+
+```javascript
+const selector = unique(element, {
+    requiredAttributes: {
+        attributeNames: ['data-cy', 'data-region']
+    }
+});
+// '[data-region="main"] [data-cy="dashboard"] .widget[data-cy="widget-a"]'
+```
+
 ### Performance Optimization with Caching
 
 ```javascript
@@ -157,6 +245,7 @@ The library follows this strategy to generate unique selectors:
 3. **Selector type precedence**: Uses the `selectorTypes` array to determine which selector types to try first
 4. **Combination fallback**: For classes and attributes, tries combinations of multiple selectors if single selectors aren't unique
 5. **Nth-child fallback**: Uses nth-child positioning as a last resort
+6. **Required attribute injection**: After the unique `>` chain is determined, any `requiredAttributes` are woven into each element's segment of the chain. Ancestors above the chain that carry a required attribute are prepended as descendant combinators. Required attributes are injected even when they are not needed for uniqueness and even when the top-level `filter` would exclude them from consideration.
 
 ## Examples of Generated Selectors
 
