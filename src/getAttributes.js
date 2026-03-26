@@ -1,3 +1,5 @@
+import { escapeAttributeValue } from './utils'
+
 /**
  * Returns the Attribute selectors of the element
  * @param  { Element } element
@@ -14,7 +16,7 @@ export function getAttributes( el, attributesToIgnore = ['id', 'class', 'length'
   {
     if ( ! ( attributesToIgnore.indexOf( next.nodeName ) > -1 ) && (!filter || filter('attribute', next.nodeName, next.value)) )
     {
-      sum.push( `[${next.nodeName}="${next.value}"]` );
+      sum.push( `[${next.nodeName}="${escapeAttributeValue(next.value)}"]` );
     }
     return sum;
   }, [] );

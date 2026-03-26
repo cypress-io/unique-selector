@@ -308,6 +308,99 @@ describe( 'Unique Selector Tests', () =>
     })
   })
   
+  describe('attribute value escaping', () => {
+    it('escapes newline character in data attribute value', () => {
+      // Value contains a real newline (U+000A) — must be escaped as \A  in CSS
+      const el = $( 'body' )[0].ownerDocument.createElement( 'td' );
+      el.setAttribute( 'data-header', 'Tanggal Claim\nDariSampai' );
+      $( 'body' ).append( el );
+      $( 'body' ).append( '<td></td>' ); // sibling to force non-trivial uniqueness
+      const uniqueSelector = unique( el, { selectorTypes: ['data-header', 'nth-child'] } );
+      expect( uniqueSelector ).to.equal( '[data-header="Tanggal Claim\\A DariSampai"]' );
+    });
+
+    it('escapes carriage return character in data attribute value', () => {
+      const el = $( 'body' )[0].ownerDocument.createElement( 'td' );
+      el.setAttribute( 'data-header', 'line1\rline2' );
+      $( 'body' ).append( el );
+      $( 'body' ).append( '<td></td>' );
+      const uniqueSelector = unique( el, { selectorTypes: ['data-header', 'nth-child'] } );
+      expect( uniqueSelector ).to.equal( '[data-header="line1\\D line2"]' );
+    });
+
+    it('escapes backslash in attribute value', () => {
+      const el = $( 'body' )[0].ownerDocument.createElement( 'div' );
+      el.setAttribute( 'data-path', 'foo\\bar' );
+      $( 'body' ).append( el );
+      $( 'body' ).append( '<div></div>' );
+      const uniqueSelector = unique( el, { selectorTypes: ['data-path', 'nth-child'] } );
+      expect( uniqueSelector ).to.equal( '[data-path="foo\\\\bar"]' );
+    });
+
+    it('escapes double quote in attribute value', () => {
+      const el = $( 'body' )[0].ownerDocument.createElement( 'div' );
+      el.setAttribute( 'data-label', 'say "hello"' );
+      $( 'body' ).append( el );
+      $( 'body' ).append( '<div></div>' );
+      const uniqueSelector = unique( el, { selectorTypes: ['data-label', 'nth-child'] } );
+      expect( uniqueSelector ).to.equal( '[data-label="say \\"hello\\""]' );
+    });
+
+    it('escapes newline in name attribute value', () => {
+      const el = $( 'body' )[0].ownerDocument.createElement( 'input' );
+      el.setAttribute( 'name', 'field\nname' );
+      $( 'body' ).append( el );
+      const uniqueSelector = unique( el, { selectorTypes: ['name', 'nth-child'] } );
+      expect( uniqueSelector ).to.equal( '[name="field\\A name"]' );
+    });
+
+    it('escapes newline in standard attribute value', () => {
+      const el = $( 'body' )[0].ownerDocument.createElement( 'div' );
+      el.setAttribute( 'aria-label', 'line one\nline two' );
+      $( 'body' ).append( el );
+      $( 'body' ).append( '<div></div>' );
+      const uniqueSelector = unique( el, { selectorTypes: ['attribute:aria-label', 'nth-child'] } );
+      expect( uniqueSelector ).to.equal( '[aria-label="line one\\A line two"]' );
+    });
+
+    it('escapes newline in requiredAttributes value', () => {
+      // getRequiredAttributeSelector must apply escapeAttributeValue to the raw DOM value
+      const el = $( 'body' )[0].ownerDocument.createElement( 'td' );
+      el.setAttribute( 'data-header', 'Tanggal Claim\nDariSampai' );
+      $( 'body' ).append( el );
+      $( 'body' ).append( '<td></td>' );
+      const result = unique( el, {
+        selectorTypes: ['nth-child'],
+        requiredAttributes: { attributeNames: ['data-header'] }
+      });
+      expect( result ).to.equal( '[data-header="Tanggal Claim\\A DariSampai"]:nth-child(1)' );
+    });
+
+    it('escapes double quote in requiredAttributes value', () => {
+      const el = $( 'body' )[0].ownerDocument.createElement( 'div' );
+      el.setAttribute( 'data-label', 'say "hello"' );
+      $( 'body' ).append( el );
+      $( 'body' ).append( '<div></div>' );
+      const result = unique( el, {
+        selectorTypes: ['nth-child'],
+        requiredAttributes: { attributeNames: ['data-label'] }
+      });
+      expect( result ).to.equal( '[data-label="say \\"hello\\""]:nth-child(1)' );
+    });
+
+    it('escapes backslash in requiredAttributes value', () => {
+      const el = $( 'body' )[0].ownerDocument.createElement( 'div' );
+      el.setAttribute( 'data-path', 'foo\\bar' );
+      $( 'body' ).append( el );
+      $( 'body' ).append( '<div></div>' );
+      const result = unique( el, {
+        selectorTypes: ['nth-child'],
+        requiredAttributes: { attributeNames: ['data-path'] }
+      });
+      expect( result ).to.equal( '[data-path="foo\\\\bar"]:nth-child(1)' );
+    });
+  });
+
   describe('name', () => {
     it( 'with value', () =>
     {
@@ -1050,7 +1143,7 @@ describe( 'Unique Selector Tests', () =>
         }
       });
       // data-foo is still injected as a required attr even though the main filter rejects it
-      expect( result ).to.include( '[data-foo="keep"]' );
+      expect( result ).to.equal( '[data-foo="keep"] #btn' );
     });
 
     describe('selector pattern edge cases', () => {
@@ -1091,8 +1184,22 @@ describe( 'Unique Selector Tests', () =>
           selectorTypes: ['attribute:data-cy-button', 'nth-child'],
           requiredAttributes: { attributeNames: ['data-cy'] }
         });
-        expect( result ).to.include( '[data-cy-button="action"]' );
-        expect( result ).to.include( '[data-cy="parent"]' );
+        expect( result ).to.equal( '[data-cy-button="action"][data-cy="parent"]' );
+      });
+
+      it('stripPattern correctly matches bracket when attribute value contains escaped characters', () => {
+        // When the base selector (from selectorTypes) already contains [data-label="say \"hello\""]
+        // the stripPattern must match the full bracket including the escaped quote inside the value.
+        const el = $( 'body' )[0].ownerDocument.createElement( 'button' );
+        el.setAttribute( 'data-label', 'say "hello"' );
+        $( 'body' ).append( el );
+        $( 'body' ).append( '<button></button>' ); // sibling to prevent uniqueness via tag
+        const result = unique( el, {
+          selectorTypes: ['data-label', 'nth-child'],
+          requiredAttributes: { attributeNames: ['data-label'] }
+        });
+        // data-label should appear exactly once — not duplicated by requiredAttributes injection
+        expect( result ).to.equal( '[data-label="say \\"hello\\""]' );
       });
 
       it('strips only the overlapping required attribute when multiple required attributes are configured', () => {
@@ -1116,8 +1223,7 @@ describe( 'Unique Selector Tests', () =>
           selectorTypes: ['data-cy', 'nth-child'],
           requiredAttributes: { attributeNames: ['data-cy', 'data-test'] }
         });
-        expect( (result.match(/\[data-cy=/g) || []).length ).to.equal( 1 );
-        expect( result ).to.include( '[data-test="primary"]' );
+        expect( result ).to.equal( '[data-cy="submit-btn"][data-test="primary"]' );
       });
     });
   })

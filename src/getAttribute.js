@@ -1,3 +1,5 @@
+import { escapeAttributeValue } from './utils'
+
 /**
  * Returns the {attr} selector of the element
  * @param  { Element } el - The element.
@@ -15,7 +17,7 @@ export const getAttributeSelector = ( el, attribute, filter ) =>
 
   if (attributeValue) {
     // if we have value that needs quotes
-    return `[${attribute}="${attributeValue}"]`;
+    return `[${attribute}="${escapeAttributeValue(attributeValue)}"]`;
   }
 
   return `[${attribute}]`;

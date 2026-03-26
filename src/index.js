@@ -13,6 +13,7 @@ import { isUnique } from './isUnique';
 import { getParents } from './getParents';
 import { getAttributeSelector } from './getAttribute';
 import { isShadowRoot } from './isShadowRoot';
+import { escapeAttributeValue } from './utils';
 
 const dataRegex = /^data-.+/;
 const attrRegex = /^attribute:(.+)/m;
@@ -40,7 +41,7 @@ function getRequiredAttributeSelector(el, compiledAttrs, filter) {
     if (attrValue === null) continue;
     if (filter && !filter('attribute', attributeName, attrValue)) continue;
     matchingSelectors.push(
-      attrValue ? `[${attributeName}="${attrValue}"]` : `[${attributeName}]`
+      attrValue ? `[${attributeName}="${escapeAttributeValue(attrValue)}"]` : `[${attributeName}]`
     );
   }
   return matchingSelectors.length > 0 ? matchingSelectors.join('') : null;
@@ -303,7 +304,8 @@ export default function unique( el, options={} ) {
           // Matches [attrName=  or [attrName]  — used to detect if the attribute is already present in a selector string.
           dedupPattern: new RegExp('\\[' + escaped + '[=\\]]'),
           // Matches [attrName="any-value"] or [attrName] — used to strip an existing attribute bracket before re-appending it.
-          stripPattern: new RegExp('\\[' + escaped + '(?:="[^"]*")?\\]'),
+          // The value pattern (?:[^"\\]|\\.)*  handles CSS-escaped characters (e.g. \", \\, \A ) correctly.
+          stripPattern: new RegExp('\\[' + escaped + '(?:="(?:[^"\\\\]|\\\\.)*")?\\]'),
         };
       })
     : null;
