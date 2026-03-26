@@ -62,9 +62,9 @@ Generates a unique CSS selector for the given DOM element.
 
   The `requiredAttributes` object has the following shape:
 
-  - **`attributeNames`** (String[]) - The attribute names to inject into the selector (e.g., `['data-component', 'data-cy']`). Exact attribute names only — not patterns or regexes.
-  - **`filter`** (Function, optional) - A filter function with the same signature as the top-level `filter` option, applied independently to control which attribute _values_ are allowed to be injected. Return `false` to skip injection for a given element. This filter is separate from the top-level `filter` and serves a different purpose: the top-level `filter` controls which traits are eligible for building a _unique_ selector, while `requiredAttributes.filter` controls which attribute values are eligible for _injection_.
-  - **`elementCache`** (Map<Element, String|null>, optional) - Cache for per-element required attribute selectors. The caller is responsible for cache invalidation.
+  - **`attributeNames`** (String[]) - The attribute names to inject into the selector (e.g., `['data-component', 'data-cy']`). Exact attribute names only — not patterns or regexes. Names are used as-provided in the generated selector with no internal normalization, so the casing you supply is the casing that appears in the output. When an attribute in `attributeNames` is already present in the base selector (from `selectorTypes`), dedup detection is case-insensitive, so duplicate injection is correctly suppressed regardless of case differences.
+  - **`filter`** (Function, optional) - A filter function with the same signature as the top-level `filter` option, applied independently to control which attribute _values_ are allowed to be injected. Return `false` to skip injection for a given element. This filter is separate from the top-level `filter` and serves a different purpose: the top-level `filter` controls which traits are eligible for building a _unique_ selector, while `requiredAttributes.filter` controls which attribute values are eligible for _injection_. The `key` argument passed to this function will match the casing of the name as provided in `attributeNames`.
+  - **`elementCache`** (Map<Element, (string|null)[]>, optional) - Cache for per-element required attribute selectors. Each cached entry is an array of individual selector strings parallel to `attributeNames` (null for attributes not present or filtered out). The caller is responsible for cache invalidation.
 
   ```javascript
   unique(element, {
