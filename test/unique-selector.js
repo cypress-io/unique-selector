@@ -588,6 +588,35 @@ describe( 'Unique Selector Tests', () =>
   })
 
   describe('requiredAttributes', () => {
+      it('dedupPattern matches base selector attribute name case-insensitively', () => {
+        // selectorTypes produces [data-Test="Bar"] (mixed case preserved from selectorType string).
+        // requiredAttributes normalises 'DATA-TEST' to 'data-test', but dedupPattern uses /i so
+        // it still recognises [data-Test= in the base selector and prevents duplication.
+        $( 'body' ).append( '<div class="foo" data-test="Bar"></div>' );
+        $( 'body' ).append( '<div class="foo2"></div>' ); // sibling to prevent tag uniqueness
+        const el = $( '.foo' ).get( 0 );
+        const result = unique( el, {
+          selectorTypes: ['data-Test', 'id', 'class', 'tag', 'nth-child'],
+          requiredAttributes: { attributeNames: ['DATA-TEST'] }
+        });
+        // data-test should appear exactly once despite the case mismatch
+        expect( result ).to.equal( '[data-Test="Bar"]' );
+      });
+
+      it('dedup still works when attributeNames case differs from selectorTypes case', () => {
+        // dedupPattern is case-insensitive, so it detects the attribute already in the base
+        // selector regardless of how attributeNames was cased. The required attribute is stripped
+        // from injection, and the base selector string is returned as-is.
+        $( 'body' ).append( '<div class="foo" data-test="Bar"></div>' );
+        const el = $( '.foo' ).get( 0 );
+        const result = unique( el, {
+          selectorTypes: ['data-test', 'id', 'class', 'tag', 'nth-child'],
+          requiredAttributes: { attributeNames: ['DATA-TEST'] }
+        });
+        // data-test appears exactly once — injection was suppressed by the case-insensitive dedup
+        expect( result ).to.equal( '[data-test="Bar"]' );
+      });
+
     it('appends required attribute to unique element selector', () => {
       $( 'body' ).append( '<div class="foo" data-test="Foo"></div>' );
       const el = $( '.foo' ).get( 0 );

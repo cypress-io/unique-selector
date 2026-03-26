@@ -288,8 +288,8 @@ export default function unique( el, options={} ) {
 
   const {
     attributeNames: requiredAttributeNames,
-    filter: reqFilter,
-    elementCache: reqCache,
+    filter: requiredAttributesFilter,
+    elementCache: requiredAttributesElementCache,
   } = requiredAttributes || {};
 
   // Precompile required attribute patterns once per call to avoid repeated
@@ -302,7 +302,8 @@ export default function unique( el, options={} ) {
         return {
           attributeName,
           // Matches [attrName=  or [attrName]  — used to detect if the attribute is already present in a selector string.
-          dedupPattern: new RegExp('\\[' + escaped + '[=\\]]'),
+          // Case-insensitive so it catches any casing the base selector builder may have used for the attribute name.
+          dedupPattern: new RegExp('\\[' + escaped + '[=\\]]', 'i'),
           // Matches [attrName="any-value"] or [attrName] — used to strip an existing attribute bracket before re-appending it.
           // The value pattern (?:[^"\\]|\\.)*  handles CSS-escaped characters (e.g. \", \\, \A ) correctly.
           stripPattern: new RegExp('\\[' + escaped + '(?:="(?:[^"\\\\]|\\\\.)*")?\\]'),
@@ -334,9 +335,9 @@ export default function unique( el, options={} ) {
 
       // Merge any matching required attributes into the element's selector
       if (hasRequiredAttrs) {
-        const reqAttr = getCachedRequiredAttr(currentElement, compiledRequiredAttrs, reqFilter, reqCache);
-        if (reqAttr) {
-          selector = insertRequiredAttrIntoSelector(selector, reqAttr, compiledRequiredAttrs);
+        const elementRequiredAttributes = getCachedRequiredAttr(currentElement, compiledRequiredAttrs, requiredAttributesFilter, requiredAttributesElementCache);
+        if (elementRequiredAttributes) {
+          selector = insertRequiredAttrIntoSelector(selector, elementRequiredAttributes, compiledRequiredAttrs);
         }
       }
 
@@ -375,7 +376,7 @@ export default function unique( el, options={} ) {
         const ancestorSelectors = [];
         let ancestor = currentElement.parentElement;
         while (ancestor) {
-          const ancestorReqAttr = getCachedRequiredAttr(ancestor, compiledRequiredAttrs, reqFilter, reqCache);
+          const ancestorReqAttr = getCachedRequiredAttr(ancestor, compiledRequiredAttrs, requiredAttributesFilter, requiredAttributesElementCache);
           if (ancestorReqAttr) {
             ancestorSelectors.unshift(ancestorReqAttr);
           }
