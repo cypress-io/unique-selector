@@ -1,3 +1,5 @@
+import { escapeAttributeValue } from './utils'
+
 /**
  * Returns the `name` attribute of the element (if one exists)
  * @param  { Object } element
@@ -10,7 +12,7 @@ export function getName( el, filter )
 
   if( name !== null && name !== '' && (!filter || filter('attribute', 'name', name)))
   {
-    return `[name="${name}"]`;
+    return `[name="${escapeAttributeValue(name)}"]`;
   }
   return null;
 }
